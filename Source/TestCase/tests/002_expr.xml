@@ -1,0 +1,253 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<test-suite id="002" name="expr">
+  <test-case id="001">
+    <script>
+      var t = debug.assert;
+      
+      t( 1 + 2 * 3 == 7 );
+      t( (1 + 2) * 3 == 9 );
+      t( -1 - 2 == -3 );
+      t( -1 * -1 == 1 );
+      t( -(1+2) == -3 );
+      t( (1+2) * (3+4) == 21 );
+    </script>
+  </test-case>
+
+  <test-case id="002">
+    <script>
+      var t = debug.assert;
+
+      t( 0.5 * 0.5 == 0.25 );
+      t( -1.5 + 1.5 == 0 );
+      t( -(2.5 * 3.5) == -8.75 );
+      t( 3.3333333333 * 3.3333333333 == 11.11111111088889 );
+    </script>
+  </test-case>
+
+  <test-case id="003">
+    <script>
+      var t = debug.assert;
+
+      t( 2 + 3 + 1 == 2 * 3 );
+      t( 0.5 * 2 == 3 - 2 );
+      t( 5 / 2 == 1 + 1.5 );
+      
+    </script>
+  </test-case>
+
+  <test-case id="004">
+    <script>
+      var t = debug.assert;
+
+      t(1 &lt; 2);
+      t(1.5 &gt; 1);
+      t(1.333 &lt; 1.334);
+      
+      t(2 != 1);
+
+    </script>
+  </test-case>
+
+  <test-case id="005">
+    <script>
+      var t = debug.assert;
+
+      var a = 10;
+      a += 20;
+      t( a == 30 );
+      
+      a++;
+      t( a == 31 );
+      
+      a-=-0.55;
+      t( a == 31.55 );
+
+    </script>
+  </test-case>
+
+  <test-case id="006">
+    <script>
+      var t = debug.assert;
+
+      var a = [0, 1, 2];
+      a[1]++;
+      
+      t(a[1] == 2);
+
+    </script>
+  </test-case>
+
+  <test-case id="007">
+    <script>
+      var t = debug.assert;
+
+      var a = 1;
+      t( a+++a+++a++ == 6 );
+  
+      t( a == 4 );
+
+    </script>
+  </test-case>
+
+  <test-case id="008" name="bool and">
+    <script>
+      var t = debug.assert;
+
+      var a = { b: true };
+      
+      t(1==1 &amp;&amp; a.b);
+
+    </script>
+  </test-case>
+
+  <test-case id="009" name="bool and priority">
+    <script>
+      var t = debug.assert;
+
+      var a = { b: 10 };
+      a = null;
+      
+      // should not crashed
+      t( (a != null &amp;&amp; a.b != null) == false );
+      t( a == null || a.b == null );
+
+    </script>
+  </test-case>
+
+  <test-case id="010" name="bool constructor">
+    <script>
+      var t = debug.assert;
+
+      var bTrue = Boolean(true);
+      t( bTrue, true );
+
+      var bTrueObj = new Boolean(true);
+      t( typeof bTrueObj, 'object' );
+      t( bTrueObj instanceof Boolean );
+      
+      t( bTrueObj.valueOf != null );
+      t( bTrueObj.valueOf(), true );
+
+    </script>
+  </test-case>
+
+  <test-case id="011" name="less than">
+    <script>
+      var t = debug.assert;
+
+      var a = 10;
+      t( a &lt; 100 );
+      
+      var obj = { a : 10 };
+      t( obj.a &lt; 100 );
+
+    </script>
+  </test-case>
+
+  <test-case id="012" name="NaN">
+    <script>
+      var t = debug.assert;
+
+      var a = 10;
+      t( a != NaN );
+      
+      t( NaN == NaN );
+      t( 'NaN' != NaN );
+      
+      t( NaN + 1 == NaN );
+      t( 1 + NaN == NaN );
+      
+      a = 'hello'.charCodeAt(-1);
+      t( a == NaN );
+      
+    </script>
+  </test-case>
+
+  <test-case id="013" name="===">
+    <script>
+      var t = debug.assert;
+
+      var a = new String(10);
+      
+      t( a == '10' );
+      t( a == 10 );
+      t( a !== '10' );
+      t( a !== 10 );
+      
+      
+    </script>
+  </test-case>
+
+  <test-case id="014" name="=== wrap">
+    <script>
+      var t = debug.assert;
+      
+      t( Number(10) === Number(10) );
+      t( String('a') === String('a') );
+      t( Boolean(true) === Boolean(true) );
+
+      t( new Number(10) !== new Number(10) );
+      t( new String('a') !== new String('a') );
+      t( new Boolean(true) !== new Boolean(true) );
+      
+    </script>
+  </test-case>
+
+  <test-case id="015" name="==">
+    <script>
+      var t = debug.assert;
+      
+      t( Number(10) == Number(10) );
+      t( String('a') == String('a') );
+      t( Boolean(true) == Boolean(true) );
+
+      t( new Number(10) == new Number(10) );
+      t( new String('a') == new String('a') );
+      t( new Boolean(true) == new Boolean(true) );
+      
+      t( 1 == "1" );
+      t( 1 == 1.0 );
+      t( 1 === 1.0 );
+      t( 1 == new Number(1) );
+      t( 'a' == new String('a') );
+      
+      // not support yet
+      // t( 1 == "1.0" );    // false
+      
+    </script> 
+  </test-case>
+  
+  <!-- Bit computing -->
+  <test-case id="020" name="binary">
+    <script>
+      var t = debug.assert;
+
+      t( 1 &lt;&lt; 1 == 2);
+      t( 2 &gt;&gt; 1 == 1);
+
+      var a = 1;
+      a &lt;&lt;= 1;
+      t(a == 2);
+
+      a &gt;&gt;= 1;
+      t(a == 1);
+
+    </script>
+  </test-case>
+
+  <test-case id="021" name="binary literal">
+    <script>
+      var t = debug.assert;
+
+      t( 0b011 == 3 );
+
+      t( (0b0101 | 0b1010) == 0b1111 );
+      t( (0b1111 &amp; 0b0101) == 0b0101 );
+      
+      t( (0b0011 &lt;&lt; 2) == 0b1100 );
+      t( (0b1100 &gt;&gt; 2) == 0b0011 );
+
+    </script>
+  </test-case>
+</test-suite>

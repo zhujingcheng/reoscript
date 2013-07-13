@@ -1,0 +1,281 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<test-suite id="007" name="string" disabled="true">
+  <test-case id="001" name="literal">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello";
+      
+      t(a == "hello");
+      t(a.length == 5);
+    </script>
+  </test-case>
+
+  <test-case id="002" name="+op">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello" + " world";
+      
+      t(a == "hello world");
+      t(a.length == 11);
+      
+      a += '!';
+      t(a == "hello world!");
+      t(a.length == 12);
+      
+    </script>
+  </test-case>
+
+  <test-case id="003" name="startsWith endsWith">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello", b = "world";
+      var c = a + " " + b;
+
+      t(c, "hello world");
+      t(c.length, 11);
+
+      t(c.endsWith('world'));
+      t(c.startsWith('hello'));
+
+    </script>
+  </test-case>
+
+  <test-case id="004" name="repeat">
+    <script>
+      var t = debug.assert;
+
+      var a = ".".repeat(3);
+
+      t(a == "...");
+      t(a.length == 3);
+    </script>
+  </test-case>
+
+  <test-case id="005" name="index access">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello world";
+      t( a.charAt(6) == 'w' );
+      t( a.charAt(0) == 'h' );
+      t( a.charAt(10) == 'd' );
+      
+      t( a[6] == 'w' );
+      t( a[0] == 'h' );
+      t( a[10] == 'd' );
+      
+      t( a.charAt(-1) == '' );
+      t( a.charAt(11) == '' );
+    </script>
+  </test-case>
+
+  <test-case id="006" name="indexOf">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello world";
+
+      t( a.indexOf('w') == 6 );
+      t( a.indexOf('h') == 0 );
+      t( a.indexOf('d') == 10 );
+
+      t( a.indexOf('a') == -1 );
+      t( a.indexOf('') == 0 );
+    </script>
+  </test-case>
+
+  <test-case id="007" name="toString">
+    <script>
+      var t = debug.assert;
+
+      var obj1 = {};
+      
+      t( obj1.toString != null );
+      t( obj1.toString() == '[object Object]' );
+      
+      t( '->' + obj1.toString() == '->[object Object]' );
+      t( '->' + obj1 == '->[object Object]' );
+      
+      t( '.' + null == '.' );
+      
+    </script>
+  </test-case>
+
+  <test-case id="008" name="copy">
+    <script>
+      var t = debug.assert;
+
+      var a = 'abc';
+      var b = a;
+      
+      a += '123';
+      
+      t( a == 'abc123' );
+      t( b == 'abc' );
+      
+    </script>
+  </test-case>
+
+  <test-case id="009" name="equals">
+    <script>
+      var t = debug.assert;
+
+      t( 'hello' == 'hello' );
+      t( 'hello' == "hello" );
+      
+      t( 'hello' != 'Hello' );
+      
+    </script>
+  </test-case>
+  
+  <!--
+  since v1.2.2 - no longer supported 
+  
+  <test-case id="010" name="index modify">
+    <script>
+      var t = debug.assert;
+
+      var a = "hello world";
+
+      a[5] = '-';
+      t(a == "hello-world");
+      
+      a[11] = '!';
+      t(a == "hello-world!");
+      
+    </script>
+  </test-case>-->
+
+  <test-case id="011" name="split">
+    <script>
+      var t = debug.assert;
+
+      var str = 'How are you doing today?';
+      var n = str.split(' ');
+      
+      if( Array.prototype.equals == null ) {
+        Array.prototype.equals = targetArray => {
+          if( targetArray == null 
+            || this.length != targetArray.length) 
+            return false;
+          
+          for(var i=0; i&lt;this.length; i++)
+            if( this[i] != targetArray[i] )
+              return false;
+          
+          return true;
+        };
+      }
+      
+      t( n.equals( ['How', 'are', 'you', 'doing', 'today?'] ) );
+
+      n = str.split();
+      t( n.equals( ["How are you doing today?"] ) );
+
+      n = str.split(' ', 3);
+      t( n.equals( ['How', 'are', 'you'] ) );
+
+    </script>
+  </test-case>
+
+  <test-case id="012" name="substr">
+    <script>
+      var t = debug.assert;
+
+      var str = 'How are you doing today?';
+      var n = str.substr(4, 3);  // from 4 get 3 chars
+      
+      t( n, 'are' );
+      
+      // len is optional, return rest of the string
+      t( str.substr(12), 'doing today?' );
+      
+      // invalid args returns empty string
+      t( str.substr(-1), '' );
+      t( str.substr(99), '' );
+
+    </script>
+  </test-case>
+
+  <test-case id="013" name="upper lower">
+    <script>
+      var t = debug.assert;
+
+      var str = 'Hello World!';
+      t( str.toUpperCase(), 'HELLO WORLD!' );
+      t( str.toLowerCase(), 'hello world!' );
+
+    </script>
+  </test-case>
+
+  <test-case id="013" name="mix primitive">
+    <script>
+      var t = debug.assert;
+
+      var s1 = new String(' Hello');
+      var s2 = ((s1.toUpperCase() + ' world ').trim());
+      
+      t( s2, 'HELLO world' );
+
+    </script>
+  </test-case>
+  
+  <test-case id="020" name="wrap">
+    <script>
+      var t = debug.assert;
+
+      t( String != null );
+      
+      var str = new String('hello');
+      t( str != null );
+      
+      t( str.toUpperCase(), 'HELLO' );
+      
+      t( str.valueOf() === 'hello' );
+
+    </script>
+  </test-case>
+
+  <test-case id="021" name="wrap args">
+    <script>
+      var t = debug.assert;
+
+      t( String != null );
+      
+      var str = new String('hello');
+      
+      t( str != null );
+      t( str == 'hello' );
+      
+      str = new String(1);
+      
+      t( str == '1' );
+      
+      str = new String(function() {});    // toString should be invoked
+      t( str, 'function() {...}' );
+
+    </script>
+  </test-case>
+
+  <test-case id="022" name="wrap operations">
+    <script>
+      var t = debug.assert;
+
+      var str = new String('hello');
+      
+      t( str + ' world', 'hello world' );
+      t( 10 + str + ' world', '10hello world' );
+      
+      var c = str + ' alfred';
+      t( c, 'hello alfred' );
+      
+      t( new String('10') == 10 );
+
+    </script>
+  </test-case>
+
+</test-suite>

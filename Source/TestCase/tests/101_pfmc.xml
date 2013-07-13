@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<test-suite id="101" name="pfmc" tag="pfmc">
+
+  <test-case id="001" name="for" stopwatch="true">
+    <script>
+      var t = debug.assert;
+      
+      for(var i=0;i&lt;100000;i++)i=i;
+      
+    </script>
+  </test-case>
+
+  <test-case id="002" name="array push" stopwatch="true">
+    <script>
+      var t = debug.assert;
+      
+      var arr = new Array();
+      
+      for(var i=0;i&lt;100000;i++)
+        arr.push(i);
+      
+    </script>
+  </test-case>
+
+  <test-case id="003" name="random array" stopwatch="true">
+    <script>
+      var t = debug.assert;
+      
+      var arr = new Array();
+      
+      for(var i=0;i&lt;100000;i++)
+        arr.push( Math.random() * 10000 );
+      
+    </script>
+  </test-case>
+
+  <test-case id="004" name="sort" stopwatch="true">
+    <script>
+      var t = debug.assert;
+      
+      var arr = new Array();
+      
+      for(var i=0;i&lt;100000;i++)
+        arr.push( Math.random() * 10000 );
+        
+      arr.sort();
+      
+    </script>
+  </test-case>
+
+  <test-case id="010" name="json parse by eval" stopwatch="true">
+    <script>
+    var t = debug.assert;
+    
+    var src = "{name: 'apple', color: 'red', count: 10}";
+      
+    for(var i=0; i&lt;10000; i++) {
+      var obj = eval(src);
+      t(obj.color, 'red');
+    }
+    </script>
+  </test-case>
+
+  <test-case id="011" name="json parse by JSON.parse" stopwatch="true">
+    <script>
+    var t = debug.assert;
+    
+    var src = "{name: 'apple', color: 'red', count: 10}";
+      
+    for(var i=0; i&lt;10000; i++) {
+      var obj = JSON.parse(src);
+      t(obj.color, 'red');
+    }
+    </script>
+  </test-case>
+
+</test-suite>

@@ -1,0 +1,115 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<test-suite id="051" name="if">
+
+  <test-case id="001">
+    <script>
+      var t = debug.assert;
+
+      var a = 10, b = 20;
+      if( a + b >= 30 )
+        t( true );
+      else
+        t( false );
+        
+    </script>
+  </test-case>
+
+  <test-case id="002" name="ambiguous">
+    <script>
+      var t = debug.assert;
+
+      function check(a) {
+        if (a &lt; 5) 
+          return 20;
+        else if (a &lt; 10)
+          return 30;
+        else 
+          return 40;
+      }
+        
+      t( check(3) , 20 );
+      t( check(8) , 30 );
+      t( check(13), 40 );
+        
+    </script>
+  </test-case>
+
+  <test-case id="003" name="ambiguous 2">
+    <script>
+      var t = debug.assert;
+
+      function check(a) {
+        if (a &lt; 5) 
+          if (a &lt; 3)
+            return 3;
+          else 
+            return 5;
+        else 
+          if (a &lt; 10)
+            return 10;
+          else if (a &lt; 20)
+            return 20;
+      }
+        
+      t( check(2) , 3 );
+      t( check(4) , 5 );
+      t( check(8) , 10 );
+      t( check(13), 20 );
+      t( check(23), null );
+        
+    </script>
+  </test-case>
+
+  <test-case id="004" name="ambiguous 3">
+    <script>
+      var t = debug.assert;
+
+      function check(a) {
+        if (a &lt; 5) 
+          if (a &lt; 3)
+            return 3;
+          else 
+            return 5;
+        else 
+          if (a &lt; 10)
+            return 10;
+          else if (a &lt; 20)
+            return 20;
+      }
+        
+      t( check(2) , 3 );
+      t( check(4) , 5 );
+      t( check(8) , 10 );
+      t( check(13), 20 );
+      t( check(23), null );
+        
+    </script>
+  </test-case>
+
+
+  <test-case id="005" name="if else branch">
+    <script>
+      var t = debug.assert;
+  
+      var a = 0;
+      
+      function check() {
+        return a++;
+      }
+      
+      if (check() == 0) {             // check invoked
+      
+      } else if (check() == 2) {      // check not be invoked
+      
+      } else if (check() == 3) {      // check not be invoked
+          
+      }
+      
+      // 'a' should be 1 since 'check' must be called only once
+      t( a, 1 );
+      
+        
+    </script>
+  </test-case>
+</test-suite>

@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<test-suite id="004" name="object">
+
+  <test-case id="001">
+    <script>
+      var t = debug.assert;
+
+      var obj = { a : 10 };
+      
+      t( obj != null );
+      t( obj.a == 10 );
+      
+      obj.b = 20;
+      t( obj.b == 20 );
+      
+      t( obj.a + obj.b == 30 );
+    </script>
+  </test-case>
+
+  <test-case id="002">
+    <script>
+      var t = debug.assert;
+
+      var obj = { a : 10, b: 20, 'c': 30 };
+
+      var s = '';
+      for (key in obj) {
+        if (key == 'a' || key =='b' || key=='c') {
+          if (s.length>0) s += ', ';
+          s += key;
+        }
+      }
+      
+      t( s == "a, b, c" );
+      
+    </script>
+  </test-case>
+
+  <test-case id="003" name="index access">
+    <script>
+      var t = debug.assert;
+
+      var obj = { a : 10, b: 20, 'c': 30 };
+
+      t( obj['a'] == 10 );
+      t( obj['b'] == 20 );
+      t( obj['c'] == 30 );
+      
+      var key = 'd';
+      obj[key] = obj.a - obj.b;
+      t( obj.d == -10 );
+
+    </script>
+  </test-case>
+
+  <test-case id="004" name="standard iterator">
+    <script>
+      var t = debug.assert;
+
+      function dump(obj) {
+        var o = '';
+        for (key in obj){
+          if (o.length>0) o += ', ';
+          o += key;
+        }
+        return o;
+      }
+      
+      var obj = { a : 10, b: 20, 'c': 30 };
+      t(dump(obj) == 'a, b, c');
+      
+      obj += { d: 40 };
+      t(dump(obj) == 'a, b, c, d');
+      
+    </script>
+  </test-case>
+
+  <test-case id="010" name="new">
+    <script>
+      var t = debug.assert;
+      
+      function A() {
+        this.a = 10;
+      }
+      
+      t( new A().a == 10 );
+    </script>
+  </test-case>
+
+  <test-case id="011" desc="Initializer">
+    <script>
+      var t = debug.assert;
+
+      function A() {
+        this.a = 10;
+      }
+
+      var a = new A() {
+        b : 20,
+      };
+
+      t( a.a == 10 );
+      t( a.b == 20 );
+
+    </script>
+  </test-case>
+
+  <test-case id="012">
+    <script>
+      var t = debug.assert;
+
+      function A() {
+        this.a = 10;
+      }
+
+      var obj = {
+        b: { Con: A },
+      };
+
+      var c = [null, obj];
+
+      var inst = new c[1].b.Con();
+      t( inst != null );
+      t( inst.a == 10 );
+
+    </script>
+  </test-case>
+
+  <test-case id="013" name="combine">
+    <script>
+      var t = debug.assert;
+
+      var a = { x: 10 };
+      var b = { y: 20 };
+
+      var c = a + b;
+      t( c.x == 10 );
+      t( c.y == 20 );
+
+      var d = { z: 3.14 };
+      t( (a + b + d).z == 3.14 );
+
+      var e = a;
+      e += d;
+
+      t( e.z == 3.14 );
+
+    </script>
+  </test-case>
+
+  <test-case id="014" name="toString">
+    <script>
+      var t = debug.assert;
+
+      t( new Object(), "[object Object]" );
+
+    </script>
+  </test-case>
+
+  <test-case id="020" name="delete property">
+    <script>
+      var t = debug.assert;
+
+      var a = { hello: 'world', b:function() {} };
+      t( a.hello != null );
+      t( a.b != 10 );
+
+      delete a.hello;
+      t( a.hello == null );
+      
+      delete a.b;
+      t( a.b == null );
+
+    </script>
+  </test-case>
+
+  <test-case id="021" name="delete property in iteration">
+    <script>
+      var t = debug.assert;
+
+      var obj = { a:10, b:20, c:30, d:40 };
+      
+      for (key in obj) {
+        if (key == 'b')
+          delete obj.c;
+      }
+      
+      t( obj != null );
+      t( obj.a == 10 );
+      t( obj.b == 20 );
+      t( obj.c == null );
+      t( obj.d == 40 );
+
+    </script>
+  </test-case>
+
+  <test-case id="022" name="delete non-own property">
+    <script>
+      var t = debug.assert;
+
+      var obj = {};
+      
+      t( obj != null );
+      
+      t( obj.hasOwnProperty != null );
+      t( obj.hasOwnProperty('hasOwnProperty') == false );
+      
+      obj.removeOwnProperty('hasOwnProperty');
+      t( obj.hasOwnProperty != null );
+      t( obj.hasOwnProperty('hasOwnProperty') == false );
+      
+    </script>
+  </test-case>
+
+  <test-case id="100" name="enum">
+    <script>
+      var t = debug.assert;
+      
+      var ButtonState = {
+        Disabled: 0x1,
+        Hidden: 0x2,
+        Focus: 0x4,
+        Hover: 0x8,
+        Pressed: 0x10,
+      };
+      
+      var status = ButtonState.Focus | ButtonState.Hover | ButtonState.Pressed;
+
+      t( (status &amp; ButtonState.Hover), ButtonState.Hover );
+
+    </script>
+  </test-case>
+
+  <test-case id="200" name="namespace">
+    <script>
+      var t = debug.assert;
+
+      var name1 = { User: function() {} };
+      
+      t( name1 != null );
+      t( name1.User != null );
+      
+      var user1 = new name1.User();
+      t( user1 != null );
+
+    </script>
+  </test-case>
+
+</test-suite>

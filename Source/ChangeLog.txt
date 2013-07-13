@@ -1,0 +1,110 @@
+v1.3  6/17/2013
+ - New: Performance improving
+ - New: New error handling method
+ - New: Handle or throw syntax errors at pre-interpret-time
+ - New: Handle const values at pre-interpret-time
+ - New: Inner function can cache its outer call-scope
+ - New: Inner function can be pre-interpreted (call before define is available)
+ - New: Max call-stack detection added
+ - New: Minus operator can be used to calculate elapsed milliseconds with two date objects
+ - New: IDirectory<string, object> interface is available to property access and enumeration
+ - New: Information about functions and variables is available after compiling
+ - Fixed: Function scope and call-scope has been fixed
+ - Fixed: Exception caused when array resizing has been fixed
+ - Changed: .NET IList interface can be accessed directly (DirectAccess mode is unnecessary)
+ - Changed: Reform library namespaces
+
+v1.2.2  6/3/2013
+ - New: Performance improving
+ - New: DirectAccess test cases added
+ - New: Add 'apply' method to prototype of Function
+ - New: Add 'join' method to prototype of Array
+ - New: Wrapper objects (String, Number and Boolean) is fully supported
+ - Fixed: 'return' in 'for' does not work
+ - Fixed: string.split method returns unexpected result when limit argument
+ - Changed: Using .NET primitive type of string instead of StringObject
+ - Changed: Index of array to modify a string is no longer supported 
+ - Changed: ScriptEditor enable debug-mode by default
+ 
+v1.2  5/15/2013
+ - New: Error handling supported (Error object and try/catch/finally/throw)
+ - New: Add 'Boolean' internal function
+ - New: Add 'instanceof' keyword, check whether object is instance of a constructor function
+ - New: Add '===' and '!==' operators (strict compared by data and type)
+ - New: Add Array constructor to support elements
+ - New: Add Array method 'indexOf' to prototype
+ - New: Add Array Extension Library (Linq-like operations available with CoreFeatures.FullFeatures)
+ - New: Add String 'split' and 'substr' method to prototype
+ - New: Add String 'toLowerCase' and 'toUpperCase' method to prototype
+ - New: Add Function 'call' method to prototype
+ - New: Add JSON object support ('parse' and 'stringify' methods)
+ - New: __stdin__ and __stdinln__ supported (console.read and console.readline)
+ - New: run in console ReoScript.exe is available
+ - Changed: change 'typeof' keyword to return lowercase typename
+ - Changed: change String, Number and Boolean to construct primitive value wrap
+ - Changed: eval function using current runtime context
+ - Changed: split IStdOutputListener to IStandardInputProvider and IStandardOutputListener
+
+v1.1.5  4/11/2013
+ - New: Add NaN keyword
+ - New: Add import file default path (workpath)
+ - New: Add toString method in root prototype object
+ - New: Add Stopwatch in debug object
+ - New: __stdout__ and __stdoutln__ supported
+ - New: Add 'confirm' internal function (CoreFeatures.Alert)
+ - Fixed: Convert to float failed in GetFloatValue of SRM
+ - Changed: 'import' keyword using path of current file
+
+v1.1.4  3/24/2013
+ - New: setTimeout, setInterval supported to pass parameters
+ - New: Multi-context to thread safety improving
+ - New: delete keyword to delete property is available
+ - New: Add typeof keyword
+ - New: Add removeOwnProperty method into root prototype object
+ - New: Add performance test cases
+ - New: Add Math.cos and Math.tan
+ - Fixed: Priority to boolean operator(&& ||) 
+ - Fixed: for...in statement support to declare local variables
+ - Changed: Combine Reset and ResetContext method to SRM
+ - Changed: Rename srm.DeleteGlobalVariable to srm.RemoveGlobalVariable
+ - Changed: Replace SRM to ScriptContext in NativeFunctionObject invoking
+
+v1.1.2  3/21/2013
+ - New: Add setInterval, clearTimeout, clearInterval support
+ - New: ^ operator is available to find properties existed in both A and B object
+ - New: Add error position info in Runtime Exception
+ - Fixed: Return does not work in switch
+ - Fixed: Syntax error exception
+ - Fixed: && operator returns incorrect result when float calculating
+ - Fixed: Other bugs (and test-cases)
+ - Changed: Make ArrayObject public
+
+v1.1  3/16/2013
+ - New: Improved performance for async-calling
+ - New: Lambda Expression is available
+ - New: Fully prototype mechanism supported
+ - New: Date type is available
+ - New: InvokeFunctionIfExisted method is available to SRM
+ - New: Binary literal supported (e.g. 0b0101)
+ - New: DebugMonitor for SRM is available (support debug.assert)
+ - New: Enumerator Extension is available
+ - New: CoreFeatures enum is available to create SRM with limited features
+ - New: TestCases added
+ - Fixed: sometimes parameter passing is wrong when function calling
+ - Fixed: Variable scope issue
+ - Fixed: Check and return the value from ReturnNode in Run method
+ - Changed: Rename NativeFunctionValue to NativeFunctionObject
+
+v1.0.4  3/11/2013
+ - New: Enumeration supported (for ... in)
+ - New: Precompiling supported
+ - New: Plus(+) operator to combine two objects
+ - Fixed: string can be used as identifier to an object literal
+ - Fixed: return an incorrect string type after combining two strings
+
+v1.0.3  2/12/2013
+ - New: Event Binding supported
+ 
+v1.0  2/1/2013
+ - ReoScript released
+ 
