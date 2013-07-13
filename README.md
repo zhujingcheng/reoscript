@@ -130,7 +130,7 @@ The output is:
 ## Development Documents
 
    Development Documents are available at:
-   https://github.com/unvell/ReoScript/wiki
+   https://reoscript.codeplex.com/documentation
 
 ## Offical Website
 
@@ -138,11 +138,11 @@ The output is:
    http://www.unvell.com/ReoScript
 
    Language Specification see the test-cases:
-   https://github.com/unvell/ReoScript/tree/master/TestCase/tests
+   https://reoscript.codeplex.com/wikipage?title=Language%20Specification&referringTitle=Documentation
    
 ## Change Log
 
-   https://github.com/unvell/ReoScript/wiki/Change-Log
+   https://reoscript.codeplex.com/wikipage?title=Change%20Log&referringTitle=Home
    
 ## Third-Party
 
