@@ -40,7 +40,6 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 				return;
 			}
 
-
 			List<string> files = new List<string>();
 			string workPath = null;
 			bool debug = false;

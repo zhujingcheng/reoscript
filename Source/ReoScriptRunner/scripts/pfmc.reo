@@ -1,10 +1,11 @@
 ﻿
-// this code used to test basic performance of interpreter
-
-// In my option: i7 2600K CPU
-// Count from 0 to 500000 takes 247ms
-
+// this code used to test core performance of interpreter
+//
+// Count from 0 to 500000 takes 247ms @Intel i7 2600K
+//
 // Run this script by ReoScriptRunner in Non-Debug Mode
+// will get better performance
+//
 
 var sw = debug.Stopwatch.startNew();
 
@@ -19,4 +20,4 @@ sw.stop();
 console.log('-> ' + i + ' (' + sw.elapsed + ' ms.)');
 
 //console.log('press any key to continue...');
-//console.read();    // wait any key input from user
+//console.read();    // wait for any key from user

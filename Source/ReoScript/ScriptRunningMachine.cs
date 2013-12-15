@@ -7865,19 +7865,34 @@ namespace Unvell.ReoScript
 		}
 
 		/// <summary>
-		/// Check whether a specified object is of number type.
+		/// Check whether the object is number type
 		/// </summary>
-		/// <param name="target">object will be checked</param>
-		/// <returns>true if specified object is of number type.</returns>
+		/// <param name="target">object to be checked</param>
+		/// <returns>true if object is number type</returns>
 		public static bool IsNumber(object target)
 		{
 			return target is double || target is int || target is float || target is char || target is byte 
 				|| target is short || target is long;
 		}
 
-		internal static bool IsPrimitiveTypes(object obj)
+		/// <summary>
+		/// Check whether the object is .NET primitive types
+		/// </summary>
+		/// <param name="obj">object to be checked</param>
+		/// <returns>true if object is .NET primitive type</returns>
+		public static bool IsPrimitiveTypes(object obj)
 		{
 			return obj == null || obj is bool || obj is string || IsNumber(obj);
+		}
+
+		/// <summary>
+		/// Check whether the object is boolean type
+		/// </summary>
+		/// <param name="obj">object to be checked</param>
+		/// <returns>true if object is boolean type</returns>
+		public static bool IsBoolean(object obj)
+		{
+			return obj is bool || obj is BooleanObject;
 		}
 
 		internal static MethodInfo FindCLRMethodAmbiguous(object obj, string methodName, object[] args)
@@ -8081,17 +8096,6 @@ namespace Unvell.ReoScript
 
 		#endregion
 
-		//public void Test()
-		//{
-		//	string script = @"c = 10; function xx(a,b,c){ return {aa:'bb',result:a+b+c}} arr=[1,2,3]; xx(10,11,12) ";
-		//	ReoScriptLexer l = new ReoScriptLexer(new ANTLRStringStream(script));
-		//	CommonTokenStream t = new CommonTokenStream(l);
-		//	ReoScriptParser p = new ReoScriptParser(t);
-
-		//	CommonTree tree = p.script().Tree;
-
-
-		//}
 	}
 
 	#region CompiledScript
