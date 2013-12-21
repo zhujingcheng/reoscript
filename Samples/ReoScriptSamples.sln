@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GetScriptInfo", "GetScriptI
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeFunctionExtension", "NativeFunctionExtension\NativeFunctionExtension.csproj", "{16091842-A755-4DC1-AF71-AE3D99143288}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FirstApp", "FirstApp\FirstApp.csproj", "{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,6 +69,10 @@ Global
 		{16091842-A755-4DC1-AF71-AE3D99143288}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{16091842-A755-4DC1-AF71-AE3D99143288}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{16091842-A755-4DC1-AF71-AE3D99143288}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

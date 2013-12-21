@@ -23,7 +23,7 @@
       
       function User() { }
       
-      var usr1 = &lt;User /&gt;;
+      var usr1 = new User();
       t( usr1 != null );
       
       t( typeof usr1, 'object' );

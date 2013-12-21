@@ -19,13 +19,65 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Unvell.ReoScript.TestCase
+namespace unvell.ReoScript.TestCase
 {
 	[TestSuite]
 	class ReoScriptTestSuite
 	{
 		public ScriptRunningMachine SRM { get; set; }
 	}
+
+	#region Wrapper
+	[TestSuite("Wrapper Interface")]
+	class WrapperTest : ReoScriptTestSuite
+	{
+		public int Add(int a, int b)
+		{
+			return a + b;
+		}
+
+		[TestCase]
+		public void WrapperObject()
+		{
+
+
+var srm = SRM;
+
+var myobj = new ObjectValue();
+
+string externalProperty = string.Empty;
+
+myobj["external"] = new ExternalProperty(
+	() => externalProperty,
+	(v) => { externalProperty = System.Convert.ToString(v); }
+	);
+
+myobj["add"] = new NativeFunctionObject("add", (ctx, owner, args) =>
+{
+	return (double)args[0] + (double)args[1];
+});
+
+srm["myobj"] = myobj;
+
+			srm.Run(@"
+
+myobj.name = 'hello';
+myobj.external = 'world';
+var result = myobj.add(1,2);
+
+debug.assert(myobj.name, 'hello');
+debug.assert(result, 3);
+
+");
+
+
+
+		}
+	}
+
+	#endregion
+
+	#region DirectAccess
 
 	class Friut {
 		public string Name { get; set; }
@@ -132,7 +184,6 @@ namespace Unvell.ReoScript.TestCase
 
 		#endregion
 	}
-
 
 	[TestSuite("DirectAccess")]
 	class DirectAccessTests : ReoScriptTestSuite
@@ -331,4 +382,86 @@ t(o, 'name startTime ');
 		{
 		}
 	}
+	#endregion // DirectAccess
+
+	#region ScriptVisible
+	[ScriptVisible]
+	class Contact
+	{
+		[ScriptVisible] 
+		public string Name { get; set; }
+		
+		[ScriptVisible] 
+		public List<string> PhoneNumbers { get; set; }
+
+		public string Remark { get; set; }
+
+		public Contact()
+		{
+			this.PhoneNumbers = new List<string>();
+		}
+	}
+
+	[TestSuite("AttributeVisible")]
+	class AttributeExtensionTests : ReoScriptTestSuite
+	{
+		[TestCase(WorkMode=MachineWorkMode.Default)]
+		public void CallCLR()
+		{
+			SRM["contact"] = new Contact();
+
+			string script = @"
+
+var t = debug.assert;
+
+contact.name = 'reo';
+
+t( contact.phoneNumbers != null );
+
+contact.phoneNumbers.add('01-234-567');
+
+t( contact.name, 'reo' );
+t( contact.phoneNumbers.length, 1 );
+t( contact.phoneNumbers[0], '01-234-567' );
+
+// access invisible property
+contact.remark = 'comment';
+t( contact.remark, null );
+
+";
+
+			SRM.Run(script);
+		}
+
+		[TestCase(WorkMode = MachineWorkMode.Default)]
+		public void ImportType()
+		{
+			SRM.ImportType(typeof(Contact));
+
+			string script = @"
+
+var t = debug.assert;
+
+var contact = new Contact();
+
+contact.name = 'reo';
+
+t( contact.phoneNumbers != null );
+
+contact.phoneNumbers.add('01-234-567');
+
+t( contact.name, 'reo' );
+t( contact.phoneNumbers.length, 1 );
+t( contact.phoneNumbers[0], '01-234-567' );
+
+// access invisible property
+contact.remark = 'comment';
+t( contact.remark, null );
+
+";
+
+			SRM.Run(script);
+		}
+	}
+	#endregion // ScriptVisible
 }

@@ -6,9 +6,9 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using Unvell.ReoScript.Editor;
 using System.IO;
 using ScriptEditor.Properties;
+using unvell.ReoScript.Editor;
 
 namespace ScriptEditor
 {
@@ -37,9 +37,9 @@ namespace ScriptEditor
 				{
 					if (directAccess)
 					{
-						editor.Srm.WorkMode |= Unvell.ReoScript.MachineWorkMode.AllowDirectAccess
-							| Unvell.ReoScript.MachineWorkMode.AllowCLREventBind
-							| Unvell.ReoScript.MachineWorkMode.AllowImportTypeInScript;
+						editor.Srm.WorkMode |= unvell.ReoScript.MachineWorkMode.AllowDirectAccess
+							| unvell.ReoScript.MachineWorkMode.AllowCLREventBind
+							| unvell.ReoScript.MachineWorkMode.AllowImportTypeInScript;
 					}
 					editor.Script = sr.ReadToEnd();
 				}

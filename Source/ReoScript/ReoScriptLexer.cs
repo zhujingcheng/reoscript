@@ -24,7 +24,7 @@ using System.Collections.Generic;
 using Antlr.Runtime;
 using Antlr.Runtime.Misc;
 
-namespace Unvell.ReoScript
+namespace unvell.ReoScript
 {
 [System.CodeDom.Compiler.GeneratedCode("ANTLR", "3.4")]
 [System.CLSCompliant(false)]
@@ -5380,4 +5380,4 @@ sealed internal partial class ReoScriptLexer : Antlr.Runtime.Lexer
 
 }
 
-} // namespace Unvell.ReoScript
+} // namespace unvell.ReoScript

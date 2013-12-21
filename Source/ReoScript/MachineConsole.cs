@@ -22,7 +22,7 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 
-namespace Unvell.ReoScript
+namespace unvell.ReoScript
 {
 	public class MachineConsole
 	{

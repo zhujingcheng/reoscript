@@ -67,9 +67,9 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="Unvell.ReoScript, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="unvell.ReoScript, Version=1.4.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Ref\Unvell.ReoScript.dll</HintPath>
+      <HintPath>..\Ref\unvell.ReoScript.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

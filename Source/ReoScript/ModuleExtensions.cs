@@ -21,7 +21,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Unvell.ReoScript.Extensions
+namespace unvell.ReoScript.Extensions
 {
 	public interface IModuleLoader
 	{

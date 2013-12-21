@@ -33,12 +33,12 @@ using System.Reflection.Emit;
 using Antlr.Runtime;
 using Antlr.Runtime.Tree;
 
-using Unvell.ReoScript.Properties;
-using Unvell.ReoScript.Runtime;
-using Unvell.ReoScript.Parsers;
-using Unvell.ReoScript.Reflection;
+using unvell.ReoScript.Properties;
+using unvell.ReoScript.Runtime;
+using unvell.ReoScript.Parsers;
+using unvell.ReoScript.Reflection;
 
-namespace Unvell.ReoScript
+namespace unvell.ReoScript
 {
 	#region Lexer & Parser
 	sealed internal partial class ReoScriptLexer
@@ -2360,6 +2360,7 @@ namespace Unvell.ReoScript
 
 	static class PropertyAccessHelper
 	{
+		#region Setter
 		internal static void SetProperty(ScriptContext context, object target, string identifier, object value)
 		{
 			ScriptRunningMachine srm = context.Srm;
@@ -2384,76 +2385,36 @@ namespace Unvell.ReoScript
 				IDictionary<string, object> dict = (IDictionary<string, object>)target;
 				dict[identifier] = value;
 			}
-			else if (srm.AllowDirectAccess && !(target is ISyntaxTreeReturn))
+			else if (!(target is ISyntaxTreeReturn))
 			{
 				string memberName = ScriptRunningMachine.GetNativeIdentifier(identifier);
 
-				// if value is anonymous function, try to attach CLR event
-				if (value is FunctionObject)
+				if (target.GetType().GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
 				{
-					if (srm.AllowCLREvent)
-					{
-						EventInfo ei = target.GetType().GetEvent(memberName);
-						if (ei != null)
-						{
-							srm.AttachEvent(context, target, ei, value as FunctionObject);
+					#region ScriptVisible
+					ScriptVisibleAttribute sva = null;
 
-							if (target is ObjectValue)
-							{
-								((ObjectValue)target)[identifier] = value;
-							}
-						}
-					}
-				}
-				else
-				{
 					PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-					if (pi != null)
+					sva = pi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+						typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+					if (sva != null && pi != null && (string.IsNullOrEmpty(sva.Alias)
+						|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 					{
-						try
-						{
-							if (target is Control && ((Control)target).InvokeRequired)
-							{
-								((Control)target).Invoke((MethodInvoker)(() =>
-								{
-									pi.SetValue(target, srm.ConvertToCLRType(context, value, pi.PropertyType), null);
-								}));
-							}
-							else
-							{
-								pi.SetValue(target, srm.ConvertToCLRType(context, value, pi.PropertyType), null);
-							}
-						}
-						catch (Exception ex)
-						{
-							if (srm.IgnoreCLRExceptions)
-							{
-								// call error, do nothing
-							}
-							else
-								throw ex;
-						}
+						SetCLRProperty(context, pi, target, value);
 					}
 					else
 					{
 						FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-						if (fi != null)
+						sva = fi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+						if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias)
+							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 						{
-							try
-							{
-								fi.SetValue(target, value);
-							}
-							catch (Exception ex)
-							{
-								if (srm.IgnoreCLRExceptions)
-								{
-									// call error, do nothing
-								}
-								else
-									throw ex;
-							}
+							SetCLRField(srm, fi, target, value);
 						}
 						else
 						{
@@ -2478,6 +2439,67 @@ namespace Unvell.ReoScript
 							}
 						}
 					}
+					#endregion
+				}
+				else
+				// if value is anonymous function, try to attach CLR event
+				if (value is FunctionObject)
+				{
+					if (srm.AllowCLREvent)
+					{
+						EventInfo ei = target.GetType().GetEvent(memberName);
+						if (ei != null)
+						{
+							srm.AttachEvent(context, target, ei, value as FunctionObject);
+
+							if (target is ObjectValue)
+							{
+								((ObjectValue)target)[identifier] = value;
+							}
+						}
+					}
+				}
+				else 
+				{
+					#region DirectAccess
+					PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+					if (pi != null)
+					{
+						SetCLRProperty(context, pi, target, value);
+					}
+					else
+					{
+						FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+						if (fi != null)
+						{
+							SetCLRField(srm, fi, target, value);
+						}
+						else
+						{
+							// remove event if property value is set to null
+							if (value == null && srm.AllowCLREvent)
+							{
+								EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+								if (ei != null)
+								{
+									srm.DetachEvent(target, ei);
+								}
+							}
+
+							if (target is ObjectValue)
+							{
+								((ObjectValue)target)[identifier] = value;
+							}
+							else
+							{
+								// can not found property or field, ignore this access
+							}
+						}
+					}
+					#endregion
 				}
 			}
 			else
@@ -2485,39 +2507,15 @@ namespace Unvell.ReoScript
 				// unknown type, ignore it
 			}
 		}
+		#endregion // Setter
+
+		#region Getter
 		internal static object GetProperty(ScriptContext ctx, object target, string identifier)
 		{
 			ScriptRunningMachine srm = ctx.Srm;
+			ScriptVisibleAttribute sva = null;
 
-			if (target is string)
-			{
-				// FIXME: not very good to get property 'length' in hard coding
-				if (identifier == "length")
-					return ((string)target).Length;
-				else
-					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.StringFunction[
-						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
-			}
-			else if (ScriptRunningMachine.IsNumber(target))
-			{
-				return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.NumberFunction[
-					ScriptRunningMachine.KEY_PROTOTYPE], identifier);
-			}
-			else if (target is bool)
-			{
-				return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.BooleanFunction[
-					ScriptRunningMachine.KEY_PROTOTYPE], identifier);
-			}
-			else if (target is IList)
-			{
-				// FIXME: not very good to get property 'length' in hard coding
-				if (identifier == "length")
-					return ((IList)target).Count;
-				else
-					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.ArrayFunction[
-						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
-			}
-			else if (target is ObjectValue)
+			if (target is ObjectValue)
 			{
 				ObjectValue objValue = (ObjectValue)target;
 				object val = objValue[identifier];
@@ -2538,6 +2536,34 @@ namespace Unvell.ReoScript
 					return val;
 				}
 			}
+			else if (target is string)
+			{
+				// FIXME: not very good to get property 'length' as hard coding
+				if (identifier == "length")
+					return ((string)target).Length;
+				else
+					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.StringFunction[
+						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
+			}
+			else if (ScriptRunningMachine.IsNumber(target))
+			{
+				return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.NumberFunction[
+					ScriptRunningMachine.KEY_PROTOTYPE], identifier);
+			}
+			else if (target is bool)
+			{
+				return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.BooleanFunction[
+					ScriptRunningMachine.KEY_PROTOTYPE], identifier);
+			}
+			else if (target is IList)
+			{
+				// FIXME: not very good to get property 'length' as hard coding
+				if (identifier == "length")
+					return ((IList)target).Count;
+				else
+					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.ArrayFunction[
+						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
+			}
 			else if (target is IDictionary<string, object>)
 			{
 				IDictionary<string, object> dict = (IDictionary<string, object>)target;
@@ -2545,8 +2571,67 @@ namespace Unvell.ReoScript
         dict.TryGetValue(identifier, out o);
 				return o;
 			}
+			else if ((sva = (ScriptVisibleAttribute)target.GetType().GetCustomAttributes(
+				typeof(ScriptVisibleAttribute), true).FirstOrDefault())!=null)
+			{
+				#region Attribute
+				string memberName = ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling)
+					== MachineWorkMode.AutoUppercaseWhenCLRCalling)
+					? ScriptRunningMachine.GetNativeIdentifier(identifier) : identifier;
+
+				PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+
+				sva = pi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+					typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+				if (sva != null && pi != null && ( string.IsNullOrEmpty(sva.Alias) 
+					|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+				{
+					return GetCLRProperty(srm, target, pi);
+				}
+				else
+				{
+					FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+
+					sva = fi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+						typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+					if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias) 
+						|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+					{
+						return GetCLRField(srm, target, fi);
+					}
+					else
+					{
+						EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Public | BindingFlags.Instance);
+
+						sva = ei == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+						
+						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias) 
+							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+						{
+							object attachedEventFun = srm.GetAttachedEvent(target, ei);
+
+							// synchronize registed event and property of object
+							if (target is ObjectValue)
+							{
+								((ObjectValue)target)[identifier] = attachedEventFun;
+							}
+
+							return attachedEventFun;
+						}
+						else if (target is ObjectValue)
+						{
+							return ((ObjectValue)target)[identifier];
+						}
+					}
+				}
+				#endregion
+			}
 			else if (srm.AllowDirectAccess && !(target is ISyntaxTreeReturn))
 			{
+				#region DirectAccess
 				string memberName = ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling)
 					== MachineWorkMode.AutoUppercaseWhenCLRCalling)
 					? ScriptRunningMachine.GetNativeIdentifier(identifier) : identifier;
@@ -2555,27 +2640,7 @@ namespace Unvell.ReoScript
 
 				if (pi != null)
 				{
-					try
-					{
-						object returnObj = pi.GetValue(target, null);
-
-						if (srm.AutoImportRelationType)
-						{
-							srm.ImportType(returnObj.GetType());
-						}
-
-						return returnObj;
-					}
-					catch (Exception ex)
-					{
-						if (srm.IgnoreCLRExceptions)
-						{
-							// call error, return undefined
-							return null;
-						}
-						else
-							throw ex;
-					}
+					return GetCLRProperty(srm, target, pi);
 				}
 				else
 				{
@@ -2583,20 +2648,7 @@ namespace Unvell.ReoScript
 
 					if (fi != null)
 					{
-						try
-						{
-							return fi.GetValue(target);
-						}
-						catch (Exception ex)
-						{
-							if (srm.IgnoreCLRExceptions)
-							{
-								// call error, return undefined
-								return null;
-							}
-							else
-								throw ex;
-						}
+						return GetCLRField(srm, target, fi);
 					}
 					else
 					{
@@ -2619,10 +2671,101 @@ namespace Unvell.ReoScript
 						}
 					}
 				}
+				#endregion
 			}
 
 			return null;
 		}
+		#endregion // Getter
+
+		#region Reflection Utility
+		private static void SetCLRProperty(ScriptContext context, PropertyInfo pi, object owner, object value)
+		{
+			try
+			{
+				if (owner is Control && ((Control)owner).InvokeRequired)
+				{
+					((Control)owner).Invoke((MethodInvoker)(() =>
+					{
+						pi.SetValue(owner, context.Srm.ConvertToCLRType(context, value, pi.PropertyType), null);
+					}));
+				}
+				else
+				{
+					pi.SetValue(owner, context.Srm.ConvertToCLRType(context, value, pi.PropertyType), null);
+				}
+			}
+			catch (Exception ex)
+			{
+				if (context.Srm.IgnoreCLRExceptions)
+				{
+					// call error, do nothing
+				}
+				else
+					throw ex;
+			}
+		}
+		
+		private static object GetCLRProperty(ScriptRunningMachine srm, object owner, PropertyInfo pi)
+		{
+			try
+			{
+				object returnObj = pi.GetValue(owner, null);
+
+				if (srm.AutoImportRelationType)
+				{
+					srm.ImportType(returnObj.GetType());
+				}
+
+				return returnObj;
+			}
+			catch (Exception ex)
+			{
+				if (srm.IgnoreCLRExceptions)
+				{
+					// call error, return undefined
+					return null;
+				}
+				else
+					throw ex;
+			}
+		}
+
+		private static void SetCLRField(ScriptRunningMachine srm, FieldInfo fi, object owner, object value)
+		{
+			try
+			{
+				fi.SetValue(owner, value);
+			}
+			catch (Exception ex)
+			{
+				if (srm.IgnoreCLRExceptions)
+				{
+					// call error, do nothing
+				}
+				else
+					throw ex;
+			}
+		}
+
+		private static object GetCLRField(ScriptRunningMachine srm, object owner, FieldInfo fi)
+		{
+			try
+			{
+				return fi.GetValue(owner);
+			}
+			catch (Exception ex)
+			{
+				if (srm.IgnoreCLRExceptions)
+				{
+					// call error, return undefined
+					return null;
+				}
+				else
+					throw ex;
+			}
+		}
+		#endregion
 	}
 	#endregion
 
@@ -4328,16 +4471,20 @@ namespace Unvell.ReoScript
 
 						if (!ScriptRunningMachine.IsPrimitiveTypes(ownerObj) && !(ownerObj is ISyntaxTreeReturn))
 						{
-							if (!srm.AllowDirectAccess)
+							//if (!srm.AllowDirectAccess)
+							//{
+							//	// owner object is not ReoScript object and DirectAccess is disabled.
+							//	// there is nothing can do so just return undefined.
+							//	return null;
+							//}
+							//else
+							//{
+							//	if (srm.AllowDirectAccess && !(ownerObj is ISyntaxTreeReturn))
+							//	{
+
+							// since 1.3.2 : call function from existed type no need DirectAccess allowing
+							if(!(ownerObj is ISyntaxTreeReturn))
 							{
-								// owner object is not ReoScript object and DirectAccess is disabled.
-								// there is nothing can do so just return undefined.
-								return null;
-							}
-							else
-							{
-								if (srm.AllowDirectAccess && !(ownerObj is ISyntaxTreeReturn))
-								{
 									object[] args = srm.GetParameterList(
 											(t.ChildCount <= 1 ? null : t.Children[1] as CommonTree), context);
 
@@ -4372,7 +4519,7 @@ namespace Unvell.ReoScript
 										}
 									}
 								}
-							}
+							
 						}
 
 						funObj = ((IAccess)funObj).Get();
@@ -4599,15 +4746,18 @@ namespace Unvell.ReoScript
 				}
 				else if (!(value is ObjectValue))
 				{
+					ScriptVisibleAttribute sva;
+
 					if (value is ISyntaxTreeReturn)
 					{
 						throw ctx.CreateRuntimeError(t,
-							string.Format("Attempt to access an object '{0}' that is not of Object type.", value.ToString()));
+							string.Format("Attempt to access an unsupported object type '{0}'.", value.ToString()));
 					}
-					else if (!srm.AllowDirectAccess)
+					else if (!value.GetType().GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any()
+						&& !srm.AllowDirectAccess)
 					{
 						throw ctx.CreateRuntimeError(t, string.Format(
-							"Attempt to access an object '{0}' that is not of Object type. To access .NET object, set the WorkMode to allow DirectAccess.",
+							"Attempt to access .NET object '{0}' without DirectAccess mode allowed. Set the WorkMode to enable DirectAccess.",
 							value.ToString()));
 					}
 				}
@@ -8095,7 +8245,6 @@ namespace Unvell.ReoScript
 		}
 
 		#endregion
-
 	}
 
 	#region CompiledScript
@@ -9607,5 +9756,22 @@ namespace Unvell.ReoScript
 	}
 
 	#endregion
+	#endregion
+
+	#region Attributes
+	[AttributeUsage(AttributeTargets.All)]
+	public class ScriptVisibleAttribute : Attribute
+	{
+		public ScriptVisibleAttribute() { }
+		public ScriptVisibleAttribute(string alias) { this.Alias = alias; }
+		public string Alias { get; set; }
+	}
+	//[AttributeUsage(AttributeTargets.Method)]
+	//public class ScriptFunction : Attribute
+	//{
+	//	public ScriptFunction() { }
+	//	public ScriptFunction(string alias) { this.Alias = alias; }
+	//	public string Alias { get; set; }
+	//}
 	#endregion
 }

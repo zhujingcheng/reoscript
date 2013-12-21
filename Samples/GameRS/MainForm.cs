@@ -6,7 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using Unvell.ReoScript;
+using unvell.ReoScript;
 using System.IO;
 using GameRS.Properties;
 using System.Text.RegularExpressions;
@@ -81,13 +81,14 @@ namespace GameRS
 			// clear script context, all of global variables will be removed
 			srm.Reset();
 
-			// extend function to create .net Color object
+			// create an extended function to create .NET color object
 			srm["rgb"] = new NativeFunctionObject("rgb", (ctx, owner, args) =>
 			{
 				int r = ScriptRunningMachine.GetIntParam(args, 0, 0);
 				int g = ScriptRunningMachine.GetIntParam(args, 1, 0);
 				int b = ScriptRunningMachine.GetIntParam(args, 2, 0);
 
+				// this object will be returned into the world of script
 				return Color.FromArgb(r, g, b);
 			});
 

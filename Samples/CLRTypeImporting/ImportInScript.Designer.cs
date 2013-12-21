@@ -1,4 +1,5 @@
-﻿using Unvell.ReoScript.Editor;
+﻿using unvell.ReoScript.Editor;
+
 namespace CLRTypeImporting
 {
 	partial class ImportInScript
@@ -31,7 +32,7 @@ namespace CLRTypeImporting
 		{
 			this.label1 = new System.Windows.Forms.Label();
 			this.btnRun = new System.Windows.Forms.Button();
-			this.editor = new Unvell.ReoScript.Editor.ReoScriptEditorControl();
+			this.editor = new unvell.ReoScript.Editor.ReoScriptEditorControl();
 			this.SuspendLayout();
 			// 
 			// label1

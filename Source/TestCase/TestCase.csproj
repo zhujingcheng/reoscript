@@ -82,10 +82,6 @@
     <Compile Include="CLRTestCases.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ReoScriptEditor\ReoScriptEditor.csproj">
-      <Project>{0802DFE2-D172-4099-8538-DC2C114152D1}</Project>
-      <Name>ReoScriptEditor</Name>
-    </ProjectReference>
     <ProjectReference Include="..\ReoScript\ReoScript.csproj">
       <Project>{544005E7-F55A-42E2-8DDB-B43F95F27C69}</Project>
       <Name>ReoScript</Name>

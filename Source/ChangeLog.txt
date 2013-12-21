@@ -1,3 +1,8 @@
+v1.4 12/22/2013
+ - New: Load script from fixed culture
+ - New: New .NET Access Mode: ScriptVisible Attribute
+ - New: Add Demo 'FirstApp'
+ - Changed: namespace changed to 'unvell' from 'Unvell'
 
 v1.3.1  12/12/2013
  - New: Global Variable Getter/Setter

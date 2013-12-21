@@ -1,4 +1,5 @@
-﻿using Unvell.ReoScript.Editor;
+﻿using unvell.ReoScript.Editor;
+
 namespace GameRS
 {
 	partial class MainForm
@@ -31,7 +32,7 @@ namespace GameRS
 		{
 			this.battleground = new GameRS.Battleground();
 			this.panel2 = new System.Windows.Forms.Panel();
-			this.editor = new Unvell.ReoScript.Editor.ReoScriptEditorControl();
+			this.editor = new unvell.ReoScript.Editor.ReoScriptEditorControl();
 			this.splitter1 = new System.Windows.Forms.Splitter();
 			this.panel3 = new System.Windows.Forms.Panel();
 			this.labFps = new System.Windows.Forms.Label();
