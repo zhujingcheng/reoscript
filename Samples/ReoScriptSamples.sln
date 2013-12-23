@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NativeFunctionExtension", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FirstApp", "FirstApp\FirstApp.csproj", "{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NET4DynamicObject", "NET4DynamicObject\NET4DynamicObject.csproj", "{7B7E5969-5D3E-4F3D-B4E9-305E4F9719DA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,10 @@ Global
 		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{43DB1DD2-ADF8-46BA-9497-742D1AEDEF81}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B7E5969-5D3E-4F3D-B4E9-305E4F9719DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B7E5969-5D3E-4F3D-B4E9-305E4F9719DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B7E5969-5D3E-4F3D-B4E9-305E4F9719DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B7E5969-5D3E-4F3D-B4E9-305E4F9719DA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

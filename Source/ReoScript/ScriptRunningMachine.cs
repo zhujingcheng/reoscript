@@ -4482,7 +4482,7 @@ namespace unvell.ReoScript
 							//	if (srm.AllowDirectAccess && !(ownerObj is ISyntaxTreeReturn))
 							//	{
 
-							// since 1.3.2 : call function from existed type no need DirectAccess allowing
+							// since 1.3.2 : call function from imported type does not need DirectAccess allowed
 							if(!(ownerObj is ISyntaxTreeReturn))
 							{
 									object[] args = srm.GetParameterList(
@@ -4538,6 +4538,25 @@ namespace unvell.ReoScript
 				if (funObj == null)
 				{
 					throw context.CreateRuntimeError(t, "Function is not defined: " + t.Children[0].ToString());
+				}
+
+				// v1.4.2 - support to call delegate
+				if (funObj is Delegate)
+				{
+					var dele = ((Delegate)funObj);
+
+					object[] args = srm.GetParameterList(
+							(t.ChildCount <= 1 ? null : t.Children[1] as CommonTree), context);
+
+					ParameterInfo[] paramTypeList = dele.Method.GetParameters();
+				
+					object[] convertedArgs = new object[args.Length];
+					for (int i = 0; i < convertedArgs.Length; i++)
+					{
+						convertedArgs[i] = srm.ConvertToCLRType(context, args[i], paramTypeList[i].ParameterType);
+					}
+
+					return ((Delegate)funObj).DynamicInvoke(convertedArgs);
 				}
 
 				AbstractFunctionObject fun = funObj as AbstractFunctionObject;
@@ -4746,14 +4765,13 @@ namespace unvell.ReoScript
 				}
 				else if (!(value is ObjectValue))
 				{
-					ScriptVisibleAttribute sva;
-
 					if (value is ISyntaxTreeReturn)
 					{
 						throw ctx.CreateRuntimeError(t,
 							string.Format("Attempt to access an unsupported object type '{0}'.", value.ToString()));
 					}
 					else if (!value.GetType().GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any()
+						&& !(value is IDictionary<string, object>)
 						&& !srm.AllowDirectAccess)
 					{
 						throw ctx.CreateRuntimeError(t, string.Format(

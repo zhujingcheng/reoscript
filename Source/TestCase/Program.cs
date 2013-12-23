@@ -219,7 +219,7 @@ namespace unvell.ReoScript.TestCase
 
 					object testSuite = System.Activator.CreateInstance(type);
 
-					foreach (MethodInfo method in type.GetMethods())
+					foreach (MethodInfo method in type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public))
 					{
 						TestCaseAttribute[] caseAttrs = method.GetCustomAttributes(typeof(TestCaseAttribute), false)
 							as TestCaseAttribute[];

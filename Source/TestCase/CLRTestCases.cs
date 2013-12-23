@@ -75,6 +75,33 @@ debug.assert(result, 3);
 		}
 	}
 
+	[TestSuite]
+	class BasicAccess : ReoScriptTestSuite
+	{
+		[TestCase]
+		void DictionaryAccess()
+		{
+			Dictionary<string, object> dic = new Dictionary<string, object>();
+
+			dic["name"] = "hello";
+
+			SRM["myobj"] = dic;
+
+			SRM.Run(@" debug.assert( myobj.name, 'hello' ); ");
+		}
+
+		[TestCase]
+		public void FuncCall()
+		{
+			SRM["myfunc"] = (System.Func<int, int, int>)((a, b) =>
+			{
+				return a + b;
+			});
+
+			SRM.Run(@"debug.assert( myfunc(1, 2), 3 );");
+		}
+	}
+
 	#endregion
 
 	#region DirectAccess
@@ -462,6 +489,7 @@ t( contact.remark, null );
 
 			SRM.Run(script);
 		}
+
 	}
 	#endregion // ScriptVisible
 }
