@@ -164,5 +164,25 @@
       
     </script>
   </test-case>
+  
+  <test-case id="009" name="override to prototype">
+    <script>
+      var t = debug.assert;
 
+      Array.prototype.aa = 10;
+
+      var a = [];
+      t(a.aa, 10);
+
+      a.aa += 5;
+      t(Array.prototype.aa, 10);
+      t(a.aa, 15);
+
+      a.aa=null;
+      
+      t(a.aa, null);
+      t(Array.prototype.aa, 10);
+
+    </script>
+  </test-case>
 </test-suite>

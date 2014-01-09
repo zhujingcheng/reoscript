@@ -16,7 +16,11 @@ namespace unvell.ReoScriptRunner
 		{
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
-			Application.Run(new ReoScriptEditor());
+
+			var editor = new ReoScriptEditor();
+			editor.Srm.WorkMode = ReoScript.MachineWorkMode.Full;
+
+			Application.Run(editor);
 		}
 	}
 }

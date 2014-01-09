@@ -39,25 +39,23 @@ namespace unvell.ReoScript.TestCase
 		[TestCase]
 		public void WrapperObject()
 		{
+			var srm = SRM;
 
+			var myobj = new ObjectValue();
 
-var srm = SRM;
+			string externalProperty = string.Empty;
 
-var myobj = new ObjectValue();
+			myobj["external"] = new ExternalProperty(
+				() => externalProperty,
+				(v) => { externalProperty = System.Convert.ToString(v); }
+				);
 
-string externalProperty = string.Empty;
+			myobj["add"] = new NativeFunctionObject("add", (ctx, owner, args) =>
+			{
+				return (double)args[0] + (double)args[1];
+			});
 
-myobj["external"] = new ExternalProperty(
-	() => externalProperty,
-	(v) => { externalProperty = System.Convert.ToString(v); }
-	);
-
-myobj["add"] = new NativeFunctionObject("add", (ctx, owner, args) =>
-{
-	return (double)args[0] + (double)args[1];
-});
-
-srm["myobj"] = myobj;
+			srm["myobj"] = myobj;
 
 			srm.Run(@"
 
@@ -69,8 +67,6 @@ debug.assert(myobj.name, 'hello');
 debug.assert(result, 3);
 
 ");
-
-
 
 		}
 	}
@@ -162,7 +158,7 @@ debug.assert(result, 3);
 		public bool Contains(KeyValuePair<string, object> item)
 		{
 			object o;
-			if(!(stuff.TryGetValue(item.Key, out o))) return false;
+			if (!(stuff.TryGetValue(item.Key, out o))) return false;
 			return o == item.Value;
 		}
 
@@ -375,20 +371,158 @@ t(obj.startTime, date);
 
 			SRM.Run(@"
 
+");
+		}
+
+		[TestCase]
+		public void NewKeyword()
+		{
+			SRM.ImportType(typeof(ArrayList));
+
+			SRM.Run(@"
+var arr1 = new ArrayList();
+debug.assert( arr1 != null );
+
+var arr2 = new ArrayList;
+debug.assert( arr2 != null );
+
+var alias = ArrayList;
+debug.assert( new alias() != null );
+debug.assert( new alias != null );
+
+");
+
+		}
+
+		[TestCase( WorkMode = MachineWorkMode.Full)]
+		public void ImportNamespace()
+		{
+			SRM.ImportNamespace("System.Windows.Forms");
+			SRM.ImportNamespace("System.Drawing");
+
+			SRM.Run(@"
 var t = debug.assert;
 
-var date = new Date();
+t( Color != null );
+t( Color.Red != null );
 
-obj.name = 'red alert';
-obj.startTime = date;
+");
 
-var o = '';
-for(name in obj) {
-  o+=name + ' ';
-}
+		}
 
-t(o, 'name startTime ');
+		
+		[TestCase]
+		public void CLRArrayPrototype()
+		{
+			int[] arr = { 1, 2, 3, 4, 5 };
 
+			SRM["arr"] = arr;
+			SRM.Run(@"
+var t = debug.assert;
+
+t( arr[0], 1 );
+t( arr.length, 5 );
+t( arr.join('.'), '1.2.3.4.5' );
+
+");
+		}
+
+		class MyArrayStub
+		{
+			int[] arr = new int[10];
+			public int this[int i] { get { return arr[i]; } set { arr[i] = value; } }
+			public int this[string key]
+			{
+				get { return arr[ScriptRunningMachine.GetIntValue(key.Substring(4))]; }
+				set
+				{
+					int idx = ScriptRunningMachine.GetIntValue(key.Substring(4));
+					arr[idx] = value;
+				}
+			}
+			public int Length { get { return arr.Length; } }
+		}
+
+		class MyListStub : List<object>
+		{
+			int this[string key] { get { return int.Parse(key.Substring(4)); } set { } }
+		}
+
+		[TestCase("CLR Array Index (Number)", WorkMode=FullWorkMode)]
+		public void CLRArrayIndexNumber()
+		{
+			int[] arr = new int[10];
+
+			for (int i = 0; i < arr.Length; i++)
+			{
+				arr[i] = i;
+			}
+
+			SRM["arr"] = arr;
+			SRM.Run(@" 
+debug.assert(arr.length, 10);
+
+for(var i=0;i<arr.length;i++) {
+  debug.assert( arr[i], i );
+}");
+
+			SRM["myarr"] = new MyArrayStub();
+			SRM.Run(@"
+debug.assert(myarr.length, 10);
+
+for(var i=0;i<myarr.length;i++) {
+  myarr[i] = i;
+	debug.assert( myarr[i], i );
+}");
+		}
+
+		[TestCase("CLR Array Index (String)", WorkMode = FullWorkMode)]
+		public void CLRArrayIndexString()
+		{
+			SRM["myarr"] = new MyArrayStub();
+			SRM.Run(@"
+for(var i=0;i<myarr.length;i++) {
+  myarr['item'+i] = i;
+	debug.assert( myarr['item'+i], i );
+}");
+
+			SRM["mylist"] = new MyListStub();
+			SRM.Run(@"
+for(var i=0;i<mylist.length;i++) {
+  mylist['item' + i] = i;
+	debug.assert( mylist['item'+ i], i );
+}");
+		}
+
+		[TestCase(WorkMode = FullWorkMode)]
+		public void StaticMemberAccess()
+		{
+			SRM.ImportType(typeof(System.Drawing.Color));
+
+			SRM.Run(@"
+debug.assert(Color.Yellow, 'Color [Yellow]');
+
+debug.assert(System.Drawing.SystemColors.Control != null);
+
+debug.assert(Color.Yellow, System.Drawing.Color.Yellow);
+
+");
+		}
+
+		public class StaticA
+		{
+			public class StaticB { }
+		}
+
+		[TestCase(Disabled=true)] // Not Supported Yet
+		public void InnerClasssAccess()
+		{
+			//SRM.ImportType(typeof(StaticA.StaticB));
+
+			SRM.Run(@"
+alert( StaticA.StaticB );
+debug.assert( StaticA.StaticB != null );
+debug.assert( new StaticB() != null );
 ");
 		}
 

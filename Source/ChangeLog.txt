@@ -1,3 +1,11 @@
+v1.4.2 1/10/2013
+ - New: Accessing index property of .NET objects 
+ - New: Accessing static member of .NET types
+ - New: Create .NET type by using full name of type
+ - New: Create .NET inner type from another type
+ - Fixed: When call .NET methods by name may get an incorrected method to call
+ - Changed: Accessing array by pass null argument will cause exception
+
 v1.4 12/22/2013
  - New: Load script from fixed culture
  - New: New .NET Access Mode: ScriptVisible Attribute

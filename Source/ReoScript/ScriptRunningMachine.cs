@@ -16,6 +16,9 @@
  * 
  ****************************************************************************/
 
+// disable Obsolete warning
+#pragma warning disable 612, 618
+
 using System;
 using System.IO;
 using System.Linq;
@@ -1588,18 +1591,24 @@ namespace unvell.ReoScript
 
 				objValue["push"] = new NativeFunctionObject("push", (ctx, owner, args) =>
 				{
-					if (!(owner is ArrayObject)) return null;
+					IList array = GetIList(owner);
+					if (array == null) return null;
 
 					foreach (object v in args)
 					{
-						((ArrayObject)owner).List.Add(v);
+						array.Add(v);
 					}
 					return null;
 				});
 
 				objValue["slice"] = new NativeFunctionObject("slice", (ctx, owner, args) =>
 				{
-					if (args.Length < 1 || !(owner is ArrayObject)) return false;
+					if (args.Length < 1) return false;
+
+					if (!(owner is ArrayObject))
+					{
+						throw new NotSupportedException("call 'slice' method to a .NET object that is not supported currently.");
+					}
 
 					ArrayObject arr = (ArrayObject)owner;
 					ArrayObject newArray = ctx.CreateNewArray();
@@ -1618,7 +1627,12 @@ namespace unvell.ReoScript
 
 				objValue["splice"] = new NativeFunctionObject("splice", (ctx, owner, args) =>
 				{
-					if (args.Length < 2 || !(owner is ArrayObject)) return false;
+					if (args.Length < 2) return false;
+					
+					if (!(owner is ArrayObject))
+					{
+						throw new NotSupportedException("call 'splice' method to a .NET object that is not supported currently.");
+					}
 
 					ArrayObject arr = (ArrayObject)owner;
 			
@@ -1638,39 +1652,48 @@ namespace unvell.ReoScript
 
 				objValue["remove"] = new NativeFunctionObject("remove", (ctx, owner, args) =>
 				{
-					if (args.Length <= 0 || !(owner is ArrayObject)) return null;
+					if (args.Length <= 0) return null;
 
-					ArrayObject arr = (ArrayObject)owner;
-					arr.List.Remove(args[0]);
+					IList array = GetIList(owner);
+					if (array == null) return false;
 
+					array.Remove(args[0]);
 					return null;
 				});
 
 				objValue["indexOf"] = new NativeFunctionObject("indexOf", (ctx, owner, args) =>
 				{
-					if (!(owner is ArrayObject)) return NaNValue.Value;
+					IList array = GetIList(owner);
+					if (array == null) return NaNValue.Value;
 
 					if (args == null || args.Length <= 0) return -1;
 
-					return ((ArrayObject)owner).List.IndexOf(args[0]);
+					return array.IndexOf(args[0]);
 				});
 
 				objValue["sort"] = new NativeFunctionObject("sort", (ctx, owner, args) =>
 				{
-					if (!(owner is ArrayObject)) return null;
-
-					((ArrayObject)owner).List.Sort();
+					if (owner is ArrayObject)
+					{
+						((ArrayObject)owner).List.Sort();
+					}
+					else if (owner is Array)
+					{
+						System.Array.Sort((Array)owner);
+					}
+					
 					return null;
 				});
 
 				objValue["join"] = new NativeFunctionObject("join", (ctx, owner, args) =>
 				{
-					if (!(owner is ArrayObject)) return null;
-
+					IList array = GetIList(owner);
+					if (array == null) return null;
+					
 					string separator = args == null || args.Length == 0 ? "," : Convert.ToString(args[0]);
 
 					StringBuilder sb = new StringBuilder();
-					foreach (object element in ((ArrayObject)owner).List)
+					foreach (object element in array)
 					{
 						if (sb.Length > 0) sb.Append(separator);
 						sb.Append(Convert.ToString(element));
@@ -1681,6 +1704,16 @@ namespace unvell.ReoScript
 			}
 
 			return obj;
+		}
+
+		internal static IList GetIList(object o)
+		{
+			if (o is ArrayObject)
+				return ((ArrayObject)o).List;
+			else if (o is IList)
+				return (IList)o;
+			else
+				return null;
 		}
 	}
 	#endregion
@@ -2131,8 +2164,8 @@ namespace unvell.ReoScript
 	#endregion
 
 	#region Accessor
-	// FIXME: Accessor mechanism should be removed in order to improve the execution speed
-	//[Obsolete("Accessor mechanism should be removed in order to improve the execution speed.")]
+	// FIXME: Accessor mechanism should be removed in order to improve performance
+	[Obsolete("Accessor mechanism should be removed in order to improve performance.")]
 	interface IAccess : ISyntaxTreeReturn
 	{
 		void Set(object value);
@@ -2276,7 +2309,7 @@ namespace unvell.ReoScript
 			}
 			else if (array is string)
 			{
-				// FIXME: string can not be modified (since v1.2.2)
+				// TODO: support to modify string by using array index
 				string str = (string)array;
 				if (index < str.Length)
 				{
@@ -2288,7 +2321,35 @@ namespace unvell.ReoScript
 					array = str;
 				}
 			}
-		
+			else if (array != null)
+			{
+				var type = array.GetType();
+
+				var attrs = type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true);
+				if (Srm.AllowDirectAccess || (attrs != null && attrs.Length > 0))
+				{
+					var pis = type.GetProperties();
+
+					foreach (var pi in pis)
+					{
+						attrs = pi.GetCustomAttributes(typeof(ScriptVisibleAttribute), true);
+						var idx = pi.GetIndexParameters();
+
+						if (Srm.AllowDirectAccess && idx.Length > 0 && idx[0].ParameterType == typeof(int)
+							|| attrs != null && attrs.Length > 0)
+						{
+							try
+							{
+								pi.SetValue(array, Srm.ConvertToCLRType(Context, value, pi.PropertyType), new object[] { index });
+							}
+							catch (Exception ex)
+							{
+								if (!Srm.IgnoreCLRExceptions) throw ex;
+							}
+						}
+					}
+				}
+			}
 		}
 		public override object Get()
 		{
@@ -2316,10 +2377,37 @@ namespace unvell.ReoScript
 			//  else
 			//    return null;
 			//}
-			else
+			else if (array != null)
 			{
-				return null;
+				var type = array.GetType();
+
+				var attrs = type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true);
+				if (Srm.AllowDirectAccess || (attrs != null && attrs.Length > 0))
+				{
+					var pis = type.GetProperties();
+
+					foreach (var pi in pis)
+					{
+						attrs = pi.GetCustomAttributes(typeof(ScriptVisibleAttribute), true);
+						var idx = pi.GetIndexParameters();
+
+						if (Srm.AllowDirectAccess && idx.Length > 0 && idx[0].ParameterType == typeof(int)
+							|| attrs != null && attrs.Length > 0)
+						{
+							try
+							{
+								return pi.GetValue(array, new object[] { index });
+							}
+							catch (Exception ex)
+							{
+								if (!Srm.IgnoreCLRExceptions) throw ex;
+							}
+						}
+					}
+				}
 			}
+
+			return null;
 		}
 		#endregion
 	}
@@ -2394,15 +2482,20 @@ namespace unvell.ReoScript
 					#region ScriptVisible
 					ScriptVisibleAttribute sva = null;
 
-					PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+					var type = target.GetType();
+					
+					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
 
 					sva = pi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
 						typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+					var processed = false;
 
 					if (sva != null && pi != null && (string.IsNullOrEmpty(sva.Alias)
 						|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 					{
 						SetCLRProperty(context, pi, target, value);
+						processed = true;
 					}
 					else
 					{
@@ -2414,7 +2507,8 @@ namespace unvell.ReoScript
 						if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias)
 							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 						{
-							SetCLRField(srm, fi, target, value);
+							SetCLRField(context, fi, target, value);
+							processed = true;
 						}
 						else
 						{
@@ -2426,19 +2520,40 @@ namespace unvell.ReoScript
 								if (ei != null)
 								{
 									srm.DetachEvent(target, ei);
+									processed = true;
 								}
-							}
-
-							if (target is ObjectValue)
-							{
-								((ObjectValue)target)[identifier] = value;
-							}
-							else
-							{
-								// can not found property or field, ignore this access
 							}
 						}
 					}
+
+					if (!processed)
+					{
+						PropertyInfo[] pis = type.GetProperties();
+						foreach (var prop in pis)
+						{
+							var attrs = prop.GetCustomAttributes(typeof(ScriptVisibleAttribute), true);
+							if (attrs != null && attrs.Length > 0)
+							{
+								var idxparas = prop.GetIndexParameters();
+
+								if (idxparas != null && idxparas.Length == 1 && idxparas[0].ParameterType == typeof(string))
+								{
+									try
+									{
+										prop.SetValue(target, identifier, null);
+									}
+									catch (Exception ex)
+									{
+										if (!srm.IgnoreCLRExceptions)
+										{
+											throw ex;
+										}
+									}
+								}
+							}
+						}
+					}
+
 					#endregion
 				}
 				else
@@ -2462,11 +2577,16 @@ namespace unvell.ReoScript
 				else 
 				{
 					#region DirectAccess
-					PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+					var type = target.GetType();
+					
+					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+					bool processed = false;
 
 					if (pi != null)
 					{
 						SetCLRProperty(context, pi, target, value);
+						processed = true;
 					}
 					else
 					{
@@ -2474,7 +2594,8 @@ namespace unvell.ReoScript
 
 						if (fi != null)
 						{
-							SetCLRField(srm, fi, target, value);
+							SetCLRField(context, fi, target, value);
+							processed = true;
 						}
 						else
 						{
@@ -2486,19 +2607,35 @@ namespace unvell.ReoScript
 								if (ei != null)
 								{
 									srm.DetachEvent(target, ei);
+									processed = true;
 								}
-							}
-
-							if (target is ObjectValue)
-							{
-								((ObjectValue)target)[identifier] = value;
-							}
-							else
-							{
-								// can not found property or field, ignore this access
 							}
 						}
 					}
+
+					if (!processed)
+					{
+						PropertyInfo[] pis = type.GetProperties();
+						foreach (var prop in pis)
+						{
+							var idxparas = prop.GetIndexParameters();
+							if (idxparas != null && idxparas.Length == 1 && idxparas[0].ParameterType == typeof(string))
+							{
+								try
+								{
+									prop.SetValue(target, srm.ConvertToCLRType(context, value ,prop.PropertyType), new object[] { identifier });
+								}
+								catch (Exception ex)
+								{
+									if (!srm.IgnoreCLRExceptions)
+									{
+										throw ex;
+									}
+								}
+							}
+						}
+					}
+
 					#endregion
 				}
 			}
@@ -2515,26 +2652,54 @@ namespace unvell.ReoScript
 			ScriptRunningMachine srm = ctx.Srm;
 			ScriptVisibleAttribute sva = null;
 
-			if (target is ObjectValue)
+			if (target is IList && identifier == "length")
+			{
+				return ((IList)target).Count;
+			}
+			else if (target is ObjectValue)
 			{
 				ObjectValue objValue = (ObjectValue)target;
-				object val = objValue[identifier];
 
-				if (val is ExternalProperty)
-				{
-					return (((ExternalProperty)val).GetNativeValue());
-				}
-				else
+				object val = null;
+
+				if (!objValue.TryGetValue(identifier, out val))
 				{
 					// if value is not found, get property from its prototype
-					if (val == null && objValue.HasOwnProperty(ScriptRunningMachine.KEY___PROTO__))
+					object proto = null;
+					if (objValue.TryGetValue(ScriptRunningMachine.KEY___PROTO__, out proto))
 					{
 						val = PropertyAccessHelper.GetProperty(ctx,
 							objValue.GetOwnProperty(ScriptRunningMachine.KEY___PROTO__), identifier);
 					}
 
-					return val;
+					if (val == null && srm.AllowDirectAccess)
+					{
+						if (target is TypedNativeFunctionObject)
+						{
+							var tfunc = (TypedNativeFunctionObject)target;
+							var type = tfunc.Type;
+
+							if (GetStaticMember(srm, type, identifier, out val))
+							{
+								return val;
+							}
+
+							// inner type
+							var innerType = type.GetNestedType(identifier);
+							if (innerType != null)
+							{
+								return innerType;
+							}
+						}
+					}
 				}
+
+				if (val is ExternalProperty)
+				{
+					return (((ExternalProperty)val).GetNativeValue());
+				}
+				//if(val==
+				return val;
 			}
 			else if (target is string)
 			{
@@ -2555,24 +2720,15 @@ namespace unvell.ReoScript
 				return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.BooleanFunction[
 					ScriptRunningMachine.KEY_PROTOTYPE], identifier);
 			}
-			else if (target is IList)
-			{
-				// FIXME: not very good to get property 'length' as hard coding
-				if (identifier == "length")
-					return ((IList)target).Count;
-				else
-					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.ArrayFunction[
-						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
-			}
 			else if (target is IDictionary<string, object>)
 			{
 				IDictionary<string, object> dict = (IDictionary<string, object>)target;
-        object o = null;
-        dict.TryGetValue(identifier, out o);
+				object o = null;
+				dict.TryGetValue(identifier, out o);
 				return o;
 			}
 			else if ((sva = (ScriptVisibleAttribute)target.GetType().GetCustomAttributes(
-				typeof(ScriptVisibleAttribute), true).FirstOrDefault())!=null)
+				typeof(ScriptVisibleAttribute), true).FirstOrDefault()) != null)
 			{
 				#region Attribute
 				string memberName = ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling)
@@ -2584,7 +2740,7 @@ namespace unvell.ReoScript
 				sva = pi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
 					typeof(ScriptVisibleAttribute), true).FirstOrDefault();
 
-				if (sva != null && pi != null && ( string.IsNullOrEmpty(sva.Alias) 
+				if (sva != null && pi != null && (string.IsNullOrEmpty(sva.Alias)
 					|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 				{
 					return GetCLRProperty(srm, target, pi);
@@ -2596,7 +2752,7 @@ namespace unvell.ReoScript
 					sva = fi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
 						typeof(ScriptVisibleAttribute), true).FirstOrDefault();
 
-					if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias) 
+					if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias)
 						|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 					{
 						return GetCLRField(srm, target, fi);
@@ -2607,8 +2763,8 @@ namespace unvell.ReoScript
 
 						sva = ei == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
 							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
-						
-						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias) 
+
+						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
 							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 						{
 							object attachedEventFun = srm.GetAttachedEvent(target, ei);
@@ -2636,7 +2792,9 @@ namespace unvell.ReoScript
 					== MachineWorkMode.AutoUppercaseWhenCLRCalling)
 					? ScriptRunningMachine.GetNativeIdentifier(identifier) : identifier;
 
-				PropertyInfo pi = target.GetType().GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+				var type = target.GetType();
+
+				PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
 
 				if (pi != null)
 				{
@@ -2644,7 +2802,7 @@ namespace unvell.ReoScript
 				}
 				else
 				{
-					FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+					FieldInfo fi = type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
 
 					if (fi != null)
 					{
@@ -2652,7 +2810,7 @@ namespace unvell.ReoScript
 					}
 					else
 					{
-						EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Public | BindingFlags.Instance);
+						EventInfo ei = type.GetEvent(memberName, BindingFlags.Public | BindingFlags.Instance);
 						if (ei != null)
 						{
 							object attachedEventFun = srm.GetAttachedEvent(target, ei);
@@ -2669,6 +2827,59 @@ namespace unvell.ReoScript
 						{
 							return ((ObjectValue)target)[identifier];
 						}
+					}
+				}
+
+				var pis = type.GetProperties().Where(p => p.GetIndexParameters().Length > 0);
+				foreach (var prop in pis)
+				{
+					var idxparas = prop.GetIndexParameters();
+					if (idxparas != null && idxparas.Length == 1 && idxparas[0].ParameterType == typeof(string))
+					{
+						try
+						{
+							return prop.GetValue(target, new object[] { identifier });
+						}
+						catch (Exception ex)
+						{
+							if (!srm.IgnoreCLRExceptions)
+							{
+								throw ex;
+							}
+						}
+
+						return null;
+					}
+				}
+
+				if (target is IList)
+				{
+					return PropertyAccessHelper.GetProperty(ctx, srm.BuiltinConstructors.ArrayFunction[
+						ScriptRunningMachine.KEY_PROTOTYPE], identifier);
+				}
+
+				// access static
+				if (target is Type)
+				{
+					var staticType = (Type)target;
+					var spis = staticType.GetProperties(BindingFlags.Static | BindingFlags.Public);
+					
+					foreach(var p in spis)
+					{
+						object value = null;
+
+						if ((p.Name.Equals(memberName) || p.Name.Equals(identifier))
+							&& GetStaticMember(srm, staticType, p.Name, out value))
+						{
+							return value;
+						}
+					}
+
+					// inner type
+					var innerType = staticType.GetNestedType(identifier);
+					if (innerType != null)
+					{
+						return innerType;
 					}
 				}
 				#endregion
@@ -2712,7 +2923,7 @@ namespace unvell.ReoScript
 			{
 				object returnObj = pi.GetValue(owner, null);
 
-				if (srm.AutoImportRelationType)
+				if (returnObj != null && srm.AutoImportRelationType)
 				{
 					srm.ImportType(returnObj.GetType());
 				}
@@ -2731,15 +2942,15 @@ namespace unvell.ReoScript
 			}
 		}
 
-		private static void SetCLRField(ScriptRunningMachine srm, FieldInfo fi, object owner, object value)
+		private static void SetCLRField(ScriptContext ctx, FieldInfo fi, object owner, object value)
 		{
 			try
 			{
-				fi.SetValue(owner, value);
+				fi.SetValue(owner, ctx.Srm.ConvertToCLRType(ctx, value, fi.FieldType));
 			}
 			catch (Exception ex)
 			{
-				if (srm.IgnoreCLRExceptions)
+				if (ctx.Srm.IgnoreCLRExceptions)
 				{
 					// call error, do nothing
 				}
@@ -2764,6 +2975,36 @@ namespace unvell.ReoScript
 				else
 					throw ex;
 			}
+		}
+
+		internal static bool GetStaticMember(ScriptRunningMachine srm, Type type, string identifier, out object value)
+		{
+			var pi = type.GetProperty(identifier, BindingFlags.Static | BindingFlags.Public);
+			if (pi != null)
+			{
+				try
+				{
+					value = pi.GetValue(null, null);
+
+					if (value != null && srm.AutoImportRelationType
+						&& !srm.ImportedTypes.Contains(value.GetType()))
+					{
+						srm.ImportType(value.GetType());
+					}
+
+					return true;
+				}
+				catch (Exception ex)
+				{
+					if (!srm.IgnoreCLRExceptions)
+					{
+						throw ex;
+					}
+				}
+			}
+
+			value = null;
+			return false;
 		}
 		#endregion
 	}
@@ -4492,7 +4733,7 @@ namespace unvell.ReoScript
 										== MachineWorkMode.AutoUppercaseWhenCLRCalling)
 										? ScriptRunningMachine.GetNativeIdentifier(methodName) : methodName;
 
-									MethodInfo mi = ScriptRunningMachine.FindCLRMethodAmbiguous(ownerObj, methodName, args);
+									MethodInfo mi = ScriptRunningMachine.FindCLRMethodAmbiguous(ownerObj.GetType(), methodName, args);
 
 									if (mi != null)
 									{
@@ -4612,49 +4853,82 @@ namespace unvell.ReoScript
 					return createdObj;
 				}
 
-				CommonTree tempTree = t.Children[0] as CommonTree;
-				CommonTree constructTree = t;
+				// get constructor if it is need to retrieve from other Accessors
+				object constructorValue = null;
+
+				// get identifier of constructor
+				string constructorName = null;
+
+				CommonTree constructTree = null;
 
 				// need a depth variable to remember the depth of construct calling
 				int committedDepth = 0, depth = 0;
 
-				// find construct calling
-				while (tempTree != null && tempTree.Children != null)
+				if (t.Type == ReoScriptLexer.IDENTIFIER)
 				{
-					if (tempTree.Type == ReoScriptLexer.FUNCTION_CALL)
+					constructorName = t.Text;
+				}
+				else
+				{
+					CommonTree tempTree = (CommonTree)t.Children[0];
+					constructTree = t;
+
+					// find construct calling
+					while (tempTree != null && tempTree.Children != null)
 					{
-						constructTree = tempTree;
-						committedDepth += depth;
+						if (tempTree.Type == ReoScriptLexer.FUNCTION_CALL)
+						{
+							constructTree = tempTree;
+							committedDepth += depth;
+						}
+
+						tempTree = (CommonTree)tempTree.Children[0];
+						depth++;
 					}
 
-					tempTree = tempTree.Children[0] as CommonTree;
-					depth++;
+					if (constructTree == null) throw context.CreateRuntimeError(t, "unexpected end to new operator.");
+
+					if (constructTree.Type == ReoScriptLexer.IDENTIFIER)
+					{
+						constructorName = constructTree.Text;
+					}
+					else
+					{
+						constructorValue = ScriptRunningMachine.ParseNode((CommonTree)constructTree.Children[0], context);
+						constructorName = constructTree.Children[0].Text;
+					}
 				}
+								
+				//if(constructTree.Type == ReoScriptLexer.IDENTIFIER
+				//	&& (constructTree.Children ==null || constructTree.Children.Count==0))
+				//{
+				//	constructorName = constructTree.Text;
+				//}
+				//else if (constructTree.Children[0].Type == ReoScriptLexer.IDENTIFIER)
+				//{
+				//	constructorName = constructTree.Children[0].Text;
+				//}
+				//if(constructorName == null)
+				//{
+				//	constructorName = ScriptRunningMachine.KEY_UNDEFINED;
+				//}
 
-				if (constructTree == null) throw context.CreateRuntimeError(t, "unexpected end to new operator.");
+				if (constructorValue == null && !string.IsNullOrEmpty(constructorName))
+				{
+					// try to find types from register types or namespaces
+					constructorValue = srm.GetClass(constructorName);
 
-				// get constructor if it is need to retrieve from other Accessors
-				object constructorValue = ScriptRunningMachine.ParseNode((CommonTree)constructTree.Children[0], context);
-
-				// get identifier of constructor
-				string constructorName = constructTree.Children[0].Type == ReoScriptLexer.IDENTIFIER
-					? constructTree.Children[0].Text : ScriptRunningMachine.KEY_UNDEFINED;
+					if (constructorValue == null && srm.AllowDirectAccess)
+					{
+						Type type = srm.FindTypeInImportedNamespaces(constructorName);
+						if (type != null)
+						{
+							constructorValue = new TypedNativeFunctionObject(type, type.Name);
+						}
+					}
+				}
 
 				if (constructorValue is IAccess) constructorValue = ((IAccess)constructorValue).Get();
-
-				if (constructorValue == null)
-				{
-					constructorValue = srm.GetClass(constructorName);
-				}
-
-				if (constructorValue == null && srm.AllowDirectAccess)
-				{
-					Type type = srm.GetImportedTypeFromNamespaces(constructorName);
-					if (type != null)
-					{
-						constructorValue = new TypedNativeFunctionObject(type, type.Name);
-					}
-				}
 
 				if (constructorValue == null)
 				{
@@ -4749,26 +5023,81 @@ namespace unvell.ReoScript
 			{
 				object value = null;
 
-				value = ScriptRunningMachine.ParseNode((CommonTree)t.Children[0], ctx);
+				var target = (CommonTree)t.Children[0];
+				var identifier = t.Children[1].Text;
+				
+				value = ScriptRunningMachine.ParseNode(target, ctx);
 				if (value is IAccess) value = ((IAccess)value).Get();
 
-				if (value == null) throw ctx.CreateRuntimeError(t,
-					"Attempt to access property of null or undefined object" +
-					((t.Children[0].Type == ReoScriptLexer.IDENTIFIER)
-					? (": " + t.Children[0].ToString()) : "."));
-
-				string identifier = t.Children[1].Text;
-
-				if (ScriptRunningMachine.IsNumber(value) || value is string || value is bool || value is IList)
+				if (srm.AllowDirectAccess)
 				{
-					// no need check
+					if (value == null)
+					{
+						// static member accessor
+						if (target.Type == ReoScriptLexer.IDENTIFIER)
+						{
+							// find a type in registered namespaces
+							//foreach (var ns in srm.ImportedNamespace)
+							//{
+							//	Type type = srm.GetTypeFromAssembly(ns, target.Text);
+							//	if (type != null)
+							//	{
+							//		return new PropertyAccess(srm, ctx, type, identifier);
+							//	}
+							//}
+
+							// no found any types, try compose the namespace string
+							StringBuilder sb = new StringBuilder(target.Text);
+
+							CommonTree right = (CommonTree)t;
+							while (right.Parent.Type == ReoScriptLexer.PROPERTY_ACCESS)
+							{
+								sb.Append('.');
+								sb.Append(right.Children[1].Text);
+
+								var type = ScriptRunningMachine.GetTypeByFullName(sb.ToString());
+								if (type != null)
+								{
+									return type;// new PropertyAccess(srm, ctx, type, ((CommonTree)right.Parent).Children[1].Text);
+								}
+
+								right = (CommonTree)right.Parent;
+							}
+						}
+					}
+					else if (value is Type)
+					{
+						var type = (Type)value;
+						if (type.Name.Equals(identifier))
+						{
+							return value;
+						}
+						else
+						{
+							return new PropertyAccess(srm, ctx, value, identifier);
+						}
+					}
 				}
-				else if (!(value is ObjectValue))
+
+				if (value == null)
+				{
+					throw ctx.CreateRuntimeError(t,
+						"Attempt to access property of null or undefined object" +
+						((t.Children[0].Type == ReoScriptLexer.IDENTIFIER)
+						? (": " + t.Children[0].ToString()) : "."));
+				}
+
+				
+				if (!(value is ObjectValue 
+					|| value is string
+					|| value is IList
+					|| value is IDictionary<string, object>
+					|| ScriptRunningMachine.IsNumber(value)))
 				{
 					if (value is ISyntaxTreeReturn)
 					{
 						throw ctx.CreateRuntimeError(t,
-							string.Format("Attempt to access an unsupported object type '{0}'.", value.ToString()));
+							string.Format("Attempt to access unsupported object type '{0}'.", value.ToString()));
 					}
 					else if (!value.GetType().GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any()
 						&& !(value is IDictionary<string, object>)
@@ -4784,6 +5113,11 @@ namespace unvell.ReoScript
 			}
 
 			#endregion
+
+			private static PropertyAccess ParseNamespaceName(ScriptRunningMachine srm, CommonTree left, CommonTree right)
+			{
+				return null;
+			}
 		}
 		#endregion
 		#region Delete Property
@@ -5513,6 +5847,50 @@ namespace unvell.ReoScript
 				return GlobalObject[identifier];
 		}
 
+		internal bool TryGet(string identifier, out object value)
+		{
+#if EXTERNAL_GETTER_SETTER
+				foreach (var getter in PropertyGetter)
+				{
+					if (getter.Key(identifier))
+					{
+						value = getter.Value(identifier);
+						return true;
+					}
+				}
+#endif
+
+			CallScope cs = CurrentCallScope;
+
+			if (cs != null)
+			{
+				if (cs.Variables.TryGetValue(identifier, out value))
+				{
+					return true;
+				}
+				else
+				{
+					CallScope outerScope = cs.CurrentFunction.OuterCallScope;
+					while (outerScope != null)
+					{
+						if (outerScope.Variables.TryGetValue(identifier, out value))
+						{
+							return true;
+						}
+
+						outerScope = outerScope.CurrentFunction.OuterCallScope;
+					}
+				}
+			}
+
+			if (GlobalObject.TryGetValue(identifier, out value))
+			{
+				return true;
+			}
+
+			return false;
+		}
+
 		/// <summary>
 		/// Remove specified variable from current call-stack.
 		/// If variable cannot be found in current call-stack, remove variable from global object.
@@ -5734,6 +6112,7 @@ namespace unvell.ReoScript
 		}
 
 		#endregion
+
 
 	}
 
@@ -6251,8 +6630,12 @@ namespace unvell.ReoScript
 		/// <param name="name">namespace to be registered into script context</param>
 		public void ImportNamespace(string name)
 		{
-			if (name.EndsWith("*")) name = name.Substring(0, name.Length - 1);
-			if (name.EndsWith(".")) name = name.Substring(0, name.Length - 1);
+			if (string.IsNullOrEmpty(name)) return;
+
+			if(name.StartsWith(" ") || name.EndsWith(" ")) name = name.Trim();
+
+			while (name.EndsWith("*")) name = name.Substring(0, name.Length - 1);
+			while (name.EndsWith(".")) name = name.Substring(0, name.Length - 1);
 
 			if (!ImportedNamespace.Contains(name))
 			{
@@ -6260,7 +6643,7 @@ namespace unvell.ReoScript
 			}
 		}
 
-		internal Type GetImportedTypeFromNamespaces(string typeName)
+		internal Type FindTypeInImportedNamespaces(string typeName)
 		{
 			Type type = null;
 
@@ -6275,30 +6658,37 @@ namespace unvell.ReoScript
 
 		internal Type GetTypeFromAssembly(string ns, string typeName)
 		{
-			Type type = null;
-
 			// search assembly which's name starting with specified namespace
 			Assembly ass = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(q => q.FullName.StartsWith(ns));
 
 			if (ass != null)
 			{
-				type = ass.GetType(ns + "." + typeName);
-				if (type != null)
+				var type = ass.GetType(ns + "." + typeName);
+				if (type != null && this.AutoImportRelationType)
 				{
 					ImportType(type);
-					return type;
 				}
+				return type;
 			}
 
-			return type;
+			return null;
+		}
+
+		internal static Type GetTypeByFullName(string typeName)
+		{
+			foreach(var ass in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				var type = ass.GetType(typeName);
+				if (type != null) return type;
+			}
+
+			return null;
 		}
 
 		internal void CombineObject(ScriptContext context, object target, ObjectValue source)
 		{
 			foreach (string key in source)
 			{
-				// FIXME: get member by PropertyAccessHelper.GetProperty?
-				//        enumerated in only own members
 				PropertyAccessHelper.SetProperty(context, target, key, source[key]);
 			}
 		}
@@ -6313,7 +6703,19 @@ namespace unvell.ReoScript
 			DetachEvent(obj, ei);
 
 			EventHandlerInfo ehi = new EventHandlerInfo(this, context, obj, ei, null, functionValue);
-			Action<object> doEvent = (e) => { InvokeFunction(context, obj, functionValue, new object[] { e }); };
+			Action<object> doEvent = (e) => {
+				try
+				{
+					InvokeFunction(context, obj, functionValue, new object[] { e });
+				}
+				catch(Exception ex)
+				{
+					if(!context.Srm.IgnoreCLRExceptions)
+					{
+						throw ex;
+					}
+				}
+			};
 
 			Delegate d = null;
 			if (ei.EventHandlerType == typeof(EventHandler))
@@ -7215,6 +7617,7 @@ namespace unvell.ReoScript
 		/// <returns>result of last exected statement</returns>
 		public object Run(string script)
 		{
+			if (script.EndsWith(" ")) script = script.TrimEnd();
 			if (!script.EndsWith(";")) script += ";";
 			return Run(script, true);
 		}
@@ -7548,13 +7951,37 @@ namespace unvell.ReoScript
 				{
 					case ReoScriptLexer.IDENTIFIER:
 						{
-							if (t.Text == ScriptRunningMachine.GLOBAL_VARIABLE_NAME)
-								return ctx.GlobalObject;
-							else
+							string identifier = t.Text;
+
+							object obj = null;
+
+							if (ctx.TryGet(identifier, out obj))
 							{
-								return ctx[t.Text];
+								return obj;
 							}
-								//return new VariableAccess(ctx.Srm, ctx, t.Text);
+
+							if (ctx.Srm.AllowDirectAccess)
+							{
+								AbstractFunctionObject afo = null;
+
+								if (ctx.Srm.TryGetClass(identifier, out afo))
+								{
+									return afo;
+								}
+								else
+								{
+									var type = ctx.Srm.FindTypeInImportedNamespaces(identifier);
+									if (type != null)
+									{
+										return new TypedNativeFunctionObject(type, type.Name);
+									}
+								}
+							}
+
+							if (identifier == ScriptRunningMachine.GLOBAL_VARIABLE_NAME)
+								return ctx.GlobalObject;
+
+							return null;
 						}
 
 					case ReoScriptLexer.THIS:
@@ -7977,54 +8404,85 @@ namespace unvell.ReoScript
 				else
 					return Convert.ToSingle(value);
 			}
+			else if ((type is IList || type.IsArray || type.IsAssignableFrom(typeof(IList))) && 
+				(value is IList || value is ArrayObject))
+			{
+				var arrSource = ArrayConstructorFunction.GetIList(value);
+
+				object[] arrTo = Array.CreateInstance(type.GetElementType(), arrSource.Count) as object[];
+				if (arrSource != null)
+				{
+					for (int i = 0; i < arrSource.Count; i++)
+					{
+						arrTo[i] = ConvertToCLRType(context, arrSource[i], type.GetElementType());
+					}
+				}
+
+				return arrTo;
+			}
+			else if (type.IsEnum
+				&& (value is string || value is StringBuilder
+				|| ScriptRunningMachine.IsNumber(value)))
+			{
+				try
+				{
+					string str = ScriptRunningMachine.ConvertToString(value);
+
+					if ((context.Srm.workMode & MachineWorkMode.AutoUppercaseWhenCLRCalling)
+						== MachineWorkMode.AutoUppercaseWhenCLRCalling)
+					{
+						var identifier = ScriptRunningMachine.GetNativeIdentifier(str);
+						try
+						{
+							return Enum.Parse(type, identifier);
+						}
+						catch
+						{
+							return Enum.Parse(type, str);
+						}
+					}
+					else
+					{
+						return Enum.Parse(type, str);
+					}
+				}
+				catch (Exception ex)
+				{
+					if (!context.Srm.IgnoreCLRExceptions)
+					{
+						throw ex;
+					}
+					return null;
+				}
+			}
 			else if (value is ObjectValue)
 			{
 				if (type == typeof(ObjectValue))
 				{
 					return value;
 				}
-				else if (AllowDirectAccess)
+
+				object obj;
+
+				try
 				{
-					object obj;
-
-					if (type.IsArray && value is ArrayObject)
+					obj = System.Activator.CreateInstance(type);
+				}
+				catch (Exception ex)
+				{
+					if (!context.Srm.IgnoreCLRExceptions)
 					{
-						ArrayObject arrSource = (ArrayObject)value;
-						int count = arrSource.List.Count;
-
-						object[] arrTo = Array.CreateInstance(type.GetElementType(), count) as object[];
-
-						for (int i = 0; i < count; i++)
-						{
-							arrTo[i] = ConvertToCLRType(context, arrSource.List[i], type.GetElementType());
-						}
-
-						obj = arrTo;
+						throw new ReoScriptException("cannot convert to .NET object from value: " + value, ex);
 					}
 					else
 					{
-						try
-						{
-							if (type.IsEnum && value is string || value is NumberObject)
-							{
-								obj = Enum.Parse(type, Convert.ToString(value));
-							}
-							else
-							{
-								obj = System.Activator.CreateInstance(type);
-							}
-						}
-						catch (Exception ex)
-						{
-							throw new ReoScriptException("cannot convert to .NET object from value: " + value, ex);
-						}
-
-						CombineObject(context, obj, (ObjectValue)value);
+						return null;
 					}
-					return obj;
 				}
-				else
-					return value;
+
+				CombineObject(context, obj, (ObjectValue)value);
+
+				return obj;
 			}
 			else
 			{
@@ -8063,11 +8521,12 @@ namespace unvell.ReoScript
 			return obj is bool || obj is BooleanObject;
 		}
 
-		internal static MethodInfo FindCLRMethodAmbiguous(object obj, string methodName, object[] args)
+		internal static MethodInfo FindCLRMethodAmbiguous(Type type, string methodName, object[] args)
 		{
-			var q = obj.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public).Where(_q => _q.Name == methodName);
+			var q = type.GetMethods(BindingFlags.Instance | BindingFlags.Public).Where(_q => _q.Name == methodName);
 
-			//MethodInfo method = null;
+			MethodInfo sameLengthMethod = null;
+			MethodInfo sameParamsMethod = null;
 
 			foreach (MethodInfo mi in q)
 			{
@@ -8075,24 +8534,49 @@ namespace unvell.ReoScript
 
 				if (pi.Length == args.Length)
 				{
-					return mi;
+					if (sameLengthMethod == null)
+					{
+						sameLengthMethod = mi;
+					}
+
+					for (int i = 0; i < args.Length && i < pi.Length; i++)
+					{
+						if (sameParamsMethod == null && CompareParameter(pi[i].ParameterType, args[i]))
+						{
+							sameParamsMethod = mi;
+							break;
+						}
+					}
 				}
-				//else
-				//{
-				//  for (int i = 0; i < args.Length && i < pi.Length; i++)
-				//  {
-				//    if (pi[i].ParameterType == typeof(string))
-				//    {
-				//      if(
-				//    }
-				//  }
-
-				//  // compare every parameters
-				//}
-
 			}
 
-			return q == null || q.Count() == 0 ? null : q.First();
+			if (sameParamsMethod != null)
+			{
+				return sameParamsMethod;
+			}
+			else if (sameLengthMethod != null)
+			{
+				return sameLengthMethod;
+			}
+			else
+			{
+				// auto
+				var mi = type.GetMethod(methodName, BindingFlags.Public);
+				if (mi != null) return mi;
+			}
+
+			return (q == null || q.Count() == 0) ? null : q.First();
+		}
+
+		private static bool CompareParameter(Type type, object obj)
+		{
+			if (obj.GetType() == type) return true;
+
+			return (type == typeof(string) && (obj is string || obj is StringObject))
+						 ||
+						 ((type == typeof(int) || type == typeof(double) || type == typeof(float)
+								|| type == typeof(short) || type == typeof(long) || type == typeof(NumberObject))
+								&& ScriptRunningMachine.IsNumber(obj));
 		}
 
 		#region JSON Converation
@@ -8209,6 +8693,11 @@ namespace unvell.ReoScript
 				return this[name] as AbstractFunctionObject;
 			else
 				return null;
+		}
+
+		internal bool TryGetClass(string name, out AbstractFunctionObject constructor)
+		{
+			return classDefines.TryGetValue(name, out constructor);
 		}
 
 		/// <summary>
@@ -8571,7 +9060,7 @@ namespace unvell.ReoScript
 		private static readonly NativeFunctionObject __eval__ = new NativeFunctionObject("eval", (ctx, owner, args) =>
 		{
 			if (args.Length == 0) return false;
-			return ctx.Srm.CalcExpression(Convert.ToString(args[0]), ctx);
+			return ctx.Srm.CalcExpression(ScriptRunningMachine.ConvertToString(args[0]), ctx);
 		});
 		#endregion
 
@@ -8689,6 +9178,12 @@ namespace unvell.ReoScript
 		/// </summary>
 		Default = 0 | MachineWorkMode.IgnoreCLRExceptions | MachineWorkMode.AutoImportRelationType |
 			MachineWorkMode.AutoUppercaseWhenCLRCalling,
+
+		/// <summary>
+		/// Define of Full WorkMode
+		/// </summary>
+		Full = AllowDirectAccess | MachineWorkMode.AllowCLREventBind | AllowImportTypeInScript 
+			| IgnoreCLRExceptions | AutoImportRelationType | AutoUppercaseWhenCLRCalling,
 
 		/// <summary>
 		/// Allows to access .NET object, type, namespace, etc. directly.
