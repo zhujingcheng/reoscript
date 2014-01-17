@@ -27,6 +27,17 @@ namespace unvell.ReoScript.TestCase
 		public ScriptRunningMachine SRM { get; set; }
 	}
 
+	[TestSuite]
+	class BasicTest
+	{
+		[TestCase]
+		void SRMInitTime()
+		{
+			ScriptRunningMachine srm = new ScriptRunningMachine();
+			srm.Reset();
+		}
+	}
+
 	#region Wrapper
 	[TestSuite("Wrapper Interface")]
 	class WrapperTest : ReoScriptTestSuite
@@ -517,25 +528,42 @@ debug.assert(Color.Yellow, System.Drawing.Color.Yellow);
 		[TestCase(Disabled=true)] // Not Supported Yet
 		public void InnerClasssAccess()
 		{
-			//SRM.ImportType(typeof(StaticA.StaticB));
+			SRM.ImportType(typeof(StaticA.StaticB));
 
 			SRM.Run(@"
-alert( StaticA.StaticB );
-debug.assert( StaticA.StaticB != null );
+debug.assert( Test.StaticA.StaticB != null );
 debug.assert( new StaticB() != null );
 ");
 		}
 
-		[TestCase("CLR Attribute Property")]
+		class StaticClassTest
+		{
+			public static int A = 10;
+		}
+
+		[TestCase]
+		public void StaticMemberModify()
+		{
+			SRM.ImportType(typeof(StaticClassTest));
+
+			SRM.Run(@"
+debug.assert( StaticClassTest != null );
+debug.assert( StaticClassTest.a, 10 );
+StaticClassTest.a = 20;
+debug.assert( StaticClassTest.a, 20 );
+");
+
+		}
+
+		[TestCase("CLR Attribute Property",Disabled=true)]
 		public void CLRAttributeProperty()
 		{
 
 		}
 
-		[TestCase("CLR Attribute Method")]
+		[TestCase("CLR Attribute Method",Disabled=true)]
 		public void CLRAttributeMethod()
 		{
-
 		}
 
 		[TestCase("TestCase Template", Disabled=true)]

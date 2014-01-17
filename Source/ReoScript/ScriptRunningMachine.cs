@@ -2311,7 +2311,11 @@ namespace unvell.ReoScript
 			{
 				// TODO: support to modify string by using array index
 				string str = (string)array;
-				if (index < str.Length)
+				if (index < 0)
+				{
+					array = ScriptRunningMachine.ConvertToString(value) + array;
+				}
+				else if (index < str.Length)
 				{
 					array = str.Substring(0, index) + Convert.ToString(value) + str.Substring(index + 1);
 				}
@@ -2367,16 +2371,6 @@ namespace unvell.ReoScript
 				string str = Convert.ToString(array);
 				return index >= 0 && index < str.Length ? (str[index].ToString()) : string.Empty;
 			}
-			//else if (Srm.EnableDirectAccess && Srm.IsDirectAccessObject(array))
-			//{
-			//  if (array is IList)
-			//  {
-			//    return ((IList)array)[index];
-			//  }
-
-			//  else
-			//    return null;
-			//}
 			else if (array != null)
 			{
 				var type = array.GetType();
@@ -2684,11 +2678,29 @@ namespace unvell.ReoScript
 								return val;
 							}
 
+							string memberName = null;
+
+							if ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling) == MachineWorkMode.AutoUppercaseWhenCLRCalling)
+							{
+								memberName = ScriptRunningMachine.GetNativeIdentifier(identifier);
+
+								if (GetStaticMember(srm, type, memberName, out val))
+								{
+									return val;
+								}
+							}
+
 							// inner type
 							var innerType = type.GetNestedType(identifier);
 							if (innerType != null)
 							{
 								return innerType;
+							}
+
+							if ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling) == MachineWorkMode.AutoUppercaseWhenCLRCalling
+								&& GetStaticMember(srm, type, memberName, out val))
+							{
+								return val;
 							}
 						}
 					}
@@ -2862,17 +2874,18 @@ namespace unvell.ReoScript
 				if (target is Type)
 				{
 					var staticType = (Type)target;
-					var spis = staticType.GetProperties(BindingFlags.Static | BindingFlags.Public);
-					
-					foreach(var p in spis)
-					{
-						object value = null;
 
-						if ((p.Name.Equals(memberName) || p.Name.Equals(identifier))
-							&& GetStaticMember(srm, staticType, p.Name, out value))
-						{
-							return value;
-						}
+					object value = null;
+
+					if (GetStaticMember(srm, staticType, identifier, out value))
+					{
+						return value;
+					}
+
+					if ((srm.WorkMode & MachineWorkMode.AutoUppercaseWhenCLRCalling) == MachineWorkMode.AutoUppercaseWhenCLRCalling
+						&& GetStaticMember(srm, staticType, memberName, out value))
+					{
+						return value;
 					}
 
 					// inner type
@@ -2999,6 +3012,32 @@ namespace unvell.ReoScript
 					if (!srm.IgnoreCLRExceptions)
 					{
 						throw ex;
+					}
+				}
+			}
+			else
+			{
+				var fi = type.GetField(identifier, BindingFlags.Static | BindingFlags.Public);
+				if (fi != null)
+				{
+					try
+					{
+						value = fi.GetValue(null);
+
+						if (value != null && srm.AutoImportRelationType
+							&& !srm.ImportedTypes.Contains(value.GetType()))
+						{
+							srm.ImportType(value.GetType());
+						}
+
+						return true;
+					}
+					catch (Exception ex)
+					{
+						if (!srm.IgnoreCLRExceptions)
+						{
+							throw ex;
+						}
 					}
 				}
 			}
@@ -4992,16 +5031,21 @@ namespace unvell.ReoScript
 
 				if (value == null)
 				{
-					throw context.CreateRuntimeError(t, "Attempt to access an array or object that is null or undefined.");
+					throw context.CreateRuntimeError(t, "Attempt to access undefined array or object.");
 				}
 
 				object indexValue = ScriptRunningMachine.ParseNode((CommonTree)t.Children[1], context);
 				if (indexValue is IAccess) indexValue = ((IAccess)indexValue).Get();
 
-				if (indexValue is string) // FIXME: StringObject
+				if (indexValue == null)
+				{
+					throw context.CreateRuntimeError(t, "Attempt to access an array or object by using an null index.");
+				}
+
+				if (indexValue is string || indexValue is StringObject) 
 				{
 					// index access for object
-					return new PropertyAccess(srm, context, value, (string)indexValue);
+					return new PropertyAccess(srm, context, value, ScriptRunningMachine.ConvertToString(indexValue));
 				}
 				else
 				{
