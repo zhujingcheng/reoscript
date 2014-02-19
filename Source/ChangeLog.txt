@@ -1,3 +1,7 @@
+v1.4.3 2/20/2013
+ - Fixed: cannot accessing field member and event in ScriptVisible mode
+ - Changed interface define of ExternalVariableAccessor for ScriptContext
+
 v1.4.2 1/10/2013
  - New: Accessing index property of .NET objects 
  - New: Accessing static member of .NET types

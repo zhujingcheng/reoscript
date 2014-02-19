@@ -12,7 +12,7 @@
  * This software released under LGPLv3 license.
  * Author: Jing Lu <dujid0@gmail.com>
  * 
- * Copyright (c) 2012-2013 unvell.com, all rights reserved.
+ * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
  ****************************************************************************/
 
@@ -2469,14 +2469,14 @@ namespace unvell.ReoScript
 			}
 			else if (!(target is ISyntaxTreeReturn))
 			{
+				Type type = target.GetType();
+
 				string memberName = ScriptRunningMachine.GetNativeIdentifier(identifier);
 
-				if (target.GetType().GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
+				if (type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
 				{
 					#region ScriptVisible
 					ScriptVisibleAttribute sva = null;
-
-					var type = target.GetType();
 					
 					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
 
@@ -2493,9 +2493,10 @@ namespace unvell.ReoScript
 					}
 					else
 					{
-						FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+						FieldInfo fi = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-						sva = fi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+						// bug #1 fixed by Jose Luis
+						sva = fi == null ? null : (ScriptVisibleAttribute)fi.GetCustomAttributes(
 							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
 
 						if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias)
@@ -2506,15 +2507,28 @@ namespace unvell.ReoScript
 						}
 						else
 						{
-							// remove event if property value is set to null
-							if (value == null && srm.AllowCLREvent)
-							{
-								EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
+							EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-								if (ei != null)
+							sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
+								typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+							if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
+								|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+							{
+								if (value != null)
 								{
+									srm.AttachEvent(context, target, ei, value as FunctionObject);
+								}
+								else
+								{
+									// remove event if property value is set to null
 									srm.DetachEvent(target, ei);
 									processed = true;
+								}
+
+								if (target is ObjectValue)
+								{
+									((ObjectValue)target)[identifier] = value;
 								}
 							}
 						}
@@ -2556,8 +2570,26 @@ namespace unvell.ReoScript
 				{
 					if (srm.AllowCLREvent)
 					{
-						EventInfo ei = target.GetType().GetEvent(memberName);
+						EventInfo ei = type.GetEvent(memberName);
 						if (ei != null)
+						{
+							srm.AttachEvent(context, target, ei, value as FunctionObject);
+
+							if (target is ObjectValue)
+							{
+								((ObjectValue)target)[identifier] = value;
+							}
+						}
+					}
+					else if (type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
+					{
+						EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+						var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
+							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+						
+						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
+							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 						{
 							srm.AttachEvent(context, target, ei, value as FunctionObject);
 
@@ -2571,8 +2603,7 @@ namespace unvell.ReoScript
 				else 
 				{
 					#region DirectAccess
-					var type = target.GetType();
-					
+				
 					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
 
 					bool processed = false;
@@ -2584,7 +2615,7 @@ namespace unvell.ReoScript
 					}
 					else
 					{
-						FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+						FieldInfo fi = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
 
 						if (fi != null)
 						{
@@ -2596,9 +2627,13 @@ namespace unvell.ReoScript
 							// remove event if property value is set to null
 							if (value == null && srm.AllowCLREvent)
 							{
-								EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
+								EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-								if (ei != null)
+								var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
+									typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+								if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
+									|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 								{
 									srm.DetachEvent(target, ei);
 									processed = true;
@@ -2761,7 +2796,8 @@ namespace unvell.ReoScript
 				{
 					FieldInfo fi = target.GetType().GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
 
-					sva = fi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+					// bug #1 fixed by Jose Luis
+					sva = fi == null ? null : (ScriptVisibleAttribute)fi.GetCustomAttributes(
 						typeof(ScriptVisibleAttribute), true).FirstOrDefault();
 
 					if (sva != null && fi != null && (string.IsNullOrEmpty(sva.Alias)
@@ -2773,7 +2809,8 @@ namespace unvell.ReoScript
 					{
 						EventInfo ei = target.GetType().GetEvent(memberName, BindingFlags.Public | BindingFlags.Instance);
 
-						sva = ei == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
+						// bug #1 fixed by Jose Luis
+						sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
 							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
 
 						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
@@ -5729,14 +5766,8 @@ namespace unvell.ReoScript
 			this.GlobalObject = srm.GlobalObject;
 			this.Srm = srm;
 
-#if EXTERNAL_GETTER_SETTER
-			PropertyGetter=new Dictionary<Func<string,bool>,Func<string,object>>();
-			PropertySetter=new Dictionary<Func<string,bool>,Func<string,object>>();
-#endif
-
 			FunctionStack = new Stack<CallScope>();
 			callStack.Push(new CallScope(this.GlobalObject, ScriptRunningMachine.entryFunction));
-
 		}
 
 		public string SourceFilePath { get; set; }
@@ -5785,11 +5816,12 @@ namespace unvell.ReoScript
 			get
 			{
 #if EXTERNAL_GETTER_SETTER
-				foreach (var getter in PropertyGetter)
+				if (ExternalVariableGetter != null)
 				{
-					if (getter.Key(identifier))
+					var val = (ExternalVariableGetter(identifier));
+					if (val != null)
 					{
-						return getter.Value(identifier);
+						return val;
 					}
 				}
 #endif
@@ -5842,9 +5874,10 @@ namespace unvell.ReoScript
 			set
 			{
 #if EXTERNAL_GETTER_SETTER
-				foreach (var setter in PropertySetter)
+				if (ExternalVariableSetter != null
+					&& ExternalVariableSetter(identifier, value))
 				{
-					if (setter.Key(identifier)) setter.Value(identifier);
+					return;
 				}
 #endif
 
@@ -5894,14 +5927,15 @@ namespace unvell.ReoScript
 		internal bool TryGet(string identifier, out object value)
 		{
 #if EXTERNAL_GETTER_SETTER
-				foreach (var getter in PropertyGetter)
+			if (ExternalVariableGetter != null)
+			{
+				value = ExternalVariableGetter(identifier);
+
+				if (value != null)
 				{
-					if (getter.Key(identifier))
-					{
-						value = getter.Value(identifier);
-						return true;
-					}
+					return true;
 				}
+			}
 #endif
 
 			CallScope cs = CurrentCallScope;
@@ -5971,9 +6005,13 @@ namespace unvell.ReoScript
 		}
 
 #if EXTERNAL_GETTER_SETTER
-		public Dictionary<Func<string, bool>, Func<string, object>> PropertyGetter { get; set; }
+		public Func<string, object> ExternalVariableGetter { get; set; }
 
-		public Dictionary<Func<string, bool>, Func<string, object>> PropertySetter { get; set; }
+		public Func<string, object, bool> ExternalVariableSetter { get; set; }
+
+		//public Dictionary<Func<string, bool>, Func<string, object>> PropertyGetter { get; set; }
+
+		//public Dictionary<Func<string, bool>, Func<string, object>> PropertySetter { get; set; }
 
 		public Func<string, string, object> ExternalRangeGenerator { get; set; }
 #endif

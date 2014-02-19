@@ -12,11 +12,11 @@
  * This software released under LGPLv3 license.
  * Author: Jing Lu <dujid0@gmail.com>
  * 
- * Copyright (c) 2012-2013 unvell.com, all rights reserved.
+ * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
  ****************************************************************************
  *
- * This control base on FastColoredTextBox 
+ * This control based on FastColoredTextBox 
  * http://www.codeproject.com/Articles/161871/Fast-Colored-TextBox-for-syntax-highlighting
  *
  * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY

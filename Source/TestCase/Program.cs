@@ -12,7 +12,7 @@
  * This software released under LGPLv3 license.
  * Author: Jing Lu <dujid0@gmail.com>
  * 
- * Copyright (c) 2012-2013 unvell.com, all rights reserved.
+ * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
  ****************************************************************************/
 
@@ -339,5 +339,31 @@ namespace unvell.ReoScript.TestCase
 		}
 
 		public TestCaseAttribute(string desc) : base() { this.Desc = desc; }
+	}
+
+	public class TestCaseAssertion
+	{
+		public static void AssertTrue(bool value)
+		{
+			if (!value) Failure("true", "false");
+		}
+
+		public static void AssertEquals(object value, object expect)
+		{
+			if (!object.Equals(value, expect))
+			{
+				Failure("expect {0}, but {1}", expect, value);
+			}
+		}
+
+		public static void Failure(string expect, string but)
+		{
+			Failure("expect {0}, but {1}", expect, but);
+		}
+
+		public static void Failure(string format, params object[] args)
+		{
+			throw new TestCaseFailureException(string.Format(format, args));
+		}
 	}
 }

@@ -12,10 +12,11 @@
  * This software released under LGPLv3 license.
  * Author: Jing Lu <dujid0@gmail.com>
  * 
- * Copyright (c) 2012-2013 unvell.com, all rights reserved.
+ * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
  ****************************************************************************/
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -35,6 +36,36 @@ namespace unvell.ReoScript.TestCase
 		{
 			ScriptRunningMachine srm = new ScriptRunningMachine();
 			srm.Reset();
+		}
+
+		[TestCase]
+		void ExternalVariableTest()
+		{
+			var srm = new ScriptRunningMachine();
+			srm["a"] = 10;
+			srm.Run("var b = a + 20; ");
+
+			TestCaseAssertion.AssertEquals(srm["b"], 30d);
+		}
+
+		[TestCase]
+		public void ExtendedVariableAccessor()
+		{
+			var srm = new ScriptRunningMachine();
+
+			var ctx = srm.CreateContext();
+
+			ctx.ExternalVariableGetter = (id) =>
+			{
+				if (id.StartsWith("$"))
+					return id.Substring(1);
+				else
+					return null;
+			};
+
+			string result = Convert.ToString(srm.CalcExpression("$A1", ctx));
+
+			TestCaseAssertion.AssertEquals(result, "A1");
 		}
 	}
 
@@ -579,7 +610,13 @@ debug.assert( StaticClassTest.a, 20 );
 	{
 		[ScriptVisible] 
 		public string Name { get; set; }
-		
+
+		[ScriptVisible]
+		public int FieldMember { get; set; }
+
+		[ScriptVisible]
+		public event EventHandler EventMember;
+
 		[ScriptVisible] 
 		public List<string> PhoneNumbers { get; set; }
 
@@ -588,6 +625,14 @@ debug.assert( StaticClassTest.a, 20 );
 		public Contact()
 		{
 			this.PhoneNumbers = new List<string>();
+		}
+
+		internal void RaiseEventMember()
+		{
+			if (this.EventMember != null)
+			{
+				this.EventMember(this, null);
+			}
 		}
 	}
 
@@ -652,6 +697,49 @@ t( contact.remark, null );
 			SRM.Run(script);
 		}
 
+		// for test bug #1
+		[TestCase(WorkMode = MachineWorkMode.Default)]
+		public void FieldAndEventMember()
+		{
+			SRM["c"] = new Contact();
+
+			SRM.Run(@"
+
+var t = debug.assert;
+
+c.fieldMember = 10;
+
+t( c.fieldMember, 10 );
+
+c.eventMember = function(){
+  this.fieldMember = 20;
+};
+
+");
+
+			((Contact)SRM["c"]).RaiseEventMember();
+
+			SRM.Run(@"
+
+var t = debug.assert;
+
+t( c.fieldMember, 20 );
+
+c.eventMember = null; // remove event
+c.fieldMember = 10;
+
+");
+			((Contact)SRM["c"]).RaiseEventMember();
+
+			SRM.Run(@"
+
+var t = debug.assert;
+
+t( c.fieldMember, 10 );
+
+");
+		}
 	}
 	#endregion // ScriptVisible
+
 }
