@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -30,50 +30,61 @@ namespace unvell.ReoScript
 
 		private List<string> fileList = new List<string>();
 
-		private bool isDebugMode = false;
+		public bool IsDebugMode { get; set; }
 
-		private bool isQuietMode = true;
+		public bool IsQuietMode { get; set; }
+
+		public MachineConsole()
+			: this(null)
+		{
+		}
 
 		public MachineConsole(string[] args)
 		{
+			this.IsDebugMode = false;
+			this.IsQuietMode = true;
+
 			srm.AddStdOutputListener(new BuiltinConsoleOutputListener());
 
 			QueryPerformanceFrequency(out freq);
 
-			foreach (string arg in args)
+			if (args != null)
 			{
-				if (arg.StartsWith("-"))
+				foreach (string arg in args)
 				{
-					string option = arg.Substring(1, arg.Length - 1);
-					switch (option)
+					if (arg.StartsWith("-"))
 					{
-						case "e":
-							isDebugMode = true;
-							break;
+						string option = arg.Substring(1, arg.Length - 1);
+						switch (option)
+						{
+							case "e":
+								IsDebugMode = true;
+								break;
 
-						case "v":
-							isQuietMode = false;
-							break;
+							case "v":
+								IsQuietMode = false;
+								break;
 
-						case "?":
-						case "h":
-						case "help":
-							OutLn("usage: srm.exe file0 file1 ... filen -[e|h]");
-							break;
-							
-						default:
-							OutLn("unknown option: " + arg);
-							break;
+							case "?":
+							case "h":
+							case "help":
+								OutLn("usage: ReoScriptSheel.exe file0 file1 ... filen -[e|h]");
+								break;
+
+							default:
+								OutLn("unknown option: " + arg);
+								break;
+						}
 					}
+					else
+						fileList.Add(arg);
 				}
-				else
-					fileList.Add(arg);
 			}
 		}
 
 		public void Run()
 		{
-			if (isDebugMode)
+			if (IsDebugMode)
 			{
 				OutLn("ReoScript Machine Console (ver1.1)");
 				OutLn("type /help to see help topic.\n");
@@ -83,18 +94,18 @@ namespace unvell.ReoScript
 			{
 				try
 				{
-					if(!isQuietMode) Out("loading " + file +"... ");
+					if(!IsQuietMode) Out("loading " + file +"... ");
 					srm.Load(file);
-					if(!isQuietMode) OutLn("ok.");
+					if(!IsQuietMode) OutLn("ok.");
 				}
 				catch(Exception ex) {
-					if(!isQuietMode) OutLn("failed: " + ex.Message);
+					if(!IsQuietMode) OutLn("failed: " + ex.Message);
 				}
 			}
 
-			if (isDebugMode)
+			if (IsDebugMode)
 			{
-				OutLn("\nReady.\n");
+				if(!IsQuietMode) OutLn("\nReady.\n");
 
 				bool isQuitRequired = false;
 
@@ -156,7 +167,16 @@ namespace unvell.ReoScript
 					{
 						try
 						{
-							srm.Run(line);
+							var res = srm.Run(line);
+
+							if (res is ObjectValue)
+							{
+								OutLn(((ObjectValue)res).DumpObject());
+							}
+							else
+							{
+								OutLn(ScriptRunningMachine.ConvertToString(res));
+							}
 						}
 						catch (ReoScriptException ex)
 						{
@@ -183,6 +203,8 @@ ReoScript Machine Console Help
                         global object.
 
 <statement>;						run ReoScript statement.
+
+.<path>                 load script resource from specified file.
 
 
  ");

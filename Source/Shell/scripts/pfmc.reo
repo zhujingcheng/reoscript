@@ -9,6 +9,11 @@
 // Runner.exe scripts/pfmc.reo -c -debug
 //
 
+if (debug == null) {
+  console.log('No debug module available, please run ReoScriptShell with -debug argument.');
+  return;
+}
+
 var sw = debug.Stopwatch.startNew();
 
 console.log('start...');

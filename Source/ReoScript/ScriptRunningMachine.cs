@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -27,11 +27,11 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Collections;
 using System.Net;
-using System.Windows.Forms;
 using System.ComponentModel;
 using System.Threading;
 using System.Collections.Generic;
 using System.Reflection.Emit;
+using System.Windows.Forms;
 
 using Antlr.Runtime;
 using Antlr.Runtime.Tree;
@@ -565,36 +565,66 @@ namespace unvell.ReoScript
 			}
 			set
 			{
-				Members[identifier] = value;
+				TrySetValue(identifier, value);
 			}
+		}
+
+		/// <summary>
+		/// Try to get property by specified name from this object
+		/// </summary>
+		/// <param name="identifier">name of property to be get</param>
+		/// <param name="value">value of property returned from this object</param>
+		/// <returns>true if property does exist in this object, otherwise return false</returns>
+		public virtual bool TryGetValue(string identifier, out object value)
+		{
+			return Members.TryGetValue(identifier, out value);
+		}
+
+		/// <summary>
+		/// Try to set property by specified name into this object
+		/// </summary>
+		/// <param name="identifier">name of property to be set</param>
+		/// <param name="value">value of property to be set</param>
+		/// <returns>true if property can be set into this object, otherwise return false</returns>
+		public virtual bool TrySetValue(string identifier, object value)
+		{
+			Members[identifier] = value;
+			return true;
 		}
 
 		/// <summary>
 		/// Check whether a property exists in object
 		/// </summary>
-		/// <param name="identifier"></param>
-		/// <returns></returns>
-		public bool HasOwnProperty(string identifier)
+		/// <param name="identifier">name of property to be checked</param>
+		/// <returns>true if property with the name does exist, otherwise return false</returns>
+		public bool HasProperty(string identifier)
 		{
 			return Members.ContainsKey(identifier);
 		}
 
-		public object GetOwnProperty(string identifier)
+		/// <summary>
+		/// Remove property by specified name from this object
+		/// </summary>
+		/// <param name="identifier">name of property to be removed</param>
+		/// <returns>true if property with the name does exist and successfully removed from this 
+		/// object, otherwise return false</returns>
+		public bool RemoveProperty(string identifier)
 		{
-			return this[identifier];
+			return Members.Remove(identifier);
 		}
 
-		public bool RemoveOwnProperty(string identifier)
+		internal bool TrySetExternalProperty(string identifier, object value)
 		{
-			if (Members.ContainsKey(identifier))
+			object property = null;
+
+			if (this.Members.TryGetValue(identifier, out property)
+				&& property is ExternalProperty)
 			{
-				Members.Remove(identifier);
+				((ExternalProperty)property).Setter(value);
 				return true;
 			}
 			else
-			{
 				return false;
-			}
 		}
 
 		public virtual string Name { get { return Constructor == null ? "Object" : Constructor.FunName; } }
@@ -670,10 +700,6 @@ namespace unvell.ReoScript
 			}
 		}
 
-		public bool TryGetValue(string identifier, out object value)
-		{
-			return Members.TryGetValue(identifier, out value);
-		}
 	}
 
 	class ObjectConstructorFunction : TypedNativeFunctionObject
@@ -700,7 +726,7 @@ namespace unvell.ReoScript
 				if (ownerObject == null)
 					return false;
 
-				return ownerObject.HasOwnProperty(Convert.ToString(args[0]));
+				return ownerObject.HasProperty(Convert.ToString(args[0]));
 			});
 
 			// remove only own property from owner object
@@ -711,7 +737,7 @@ namespace unvell.ReoScript
 				if (ownerObject == null || args.Length < 1)
 					return false;
 
-				return ownerObject.RemoveOwnProperty(Convert.ToString(args[0]));
+				return ownerObject.RemoveProperty(Convert.ToString(args[0]));
 			});
 
 			rootPrototype["toString"] = new NativeFunctionObject("toString", (ctx, owner, args) =>
@@ -2164,8 +2190,8 @@ namespace unvell.ReoScript
 	#endregion
 
 	#region Accessor
-	// FIXME: Accessor mechanism should be removed in order to improve performance
-	[Obsolete("Accessor mechanism should be removed in order to improve performance.")]
+	// FIXME: Accessor mechanism should be removed for performance improvement
+	[Obsolete("Accessor mechanism will be removed in future version for performance improvement")]
 	interface IAccess : ISyntaxTreeReturn
 	{
 		void Set(object value);
@@ -2195,7 +2221,7 @@ namespace unvell.ReoScript
 	class VariableAccess : AccessValue
 	{
 		public string Identifier { get ; set ; }
-		public IVariableContainer Scope { get; set; }
+		public IVariableProvider Scope { get; set; }
 		public object Value { get; set; }
 
 		public VariableAccess(ScriptRunningMachine srm, ScriptContext ctx, string identifier)
@@ -2451,15 +2477,12 @@ namespace unvell.ReoScript
 			{
 				ObjectValue objValue = (ObjectValue)target;
 
-				object val = objValue[identifier];
-
-				if (val is ExternalProperty)
+				// try set property via External Property Provider
+				// 
+				if (!objValue.TrySetExternalProperty(identifier, value))
 				{
-					((ExternalProperty)val).SetNativeValue(value);
-				}
-				else
-				{
-					objValue[identifier] = value;
+					// try set normal value of property
+					objValue.TrySetValue(identifier, value);
 				}
 			}
 			else if (target is IDictionary<string, object>)
@@ -2477,7 +2500,7 @@ namespace unvell.ReoScript
 				{
 					#region ScriptVisible
 					ScriptVisibleAttribute sva = null;
-					
+
 					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
 
 					sva = pi == null ? null : (ScriptVisibleAttribute)pi.GetCustomAttributes(
@@ -2565,108 +2588,110 @@ namespace unvell.ReoScript
 					#endregion
 				}
 				else
-				// if value is anonymous function, try to attach CLR event
-				if (value is FunctionObject)
-				{
-					if (srm.AllowCLREvent)
+					// if value is anonymous function, try to attach CLR event
+					if (value is FunctionObject)
 					{
-						EventInfo ei = type.GetEvent(memberName);
-						if (ei != null)
+						if (srm.AllowCLREvent)
 						{
-							srm.AttachEvent(context, target, ei, value as FunctionObject);
-
-							if (target is ObjectValue)
+							EventInfo ei = type.GetEvent(memberName);
+							if (ei != null)
 							{
-								((ObjectValue)target)[identifier] = value;
+								srm.AttachEvent(context, target, ei, value as FunctionObject);
+
+								if (target is ObjectValue)
+								{
+									((ObjectValue)target)[identifier] = value;
+								}
 							}
 						}
-					}
-					else if (type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
-					{
-						EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
-
-						var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
-							typeof(ScriptVisibleAttribute), true).FirstOrDefault();
-						
-						if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
-							|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+						else if (type.GetCustomAttributes(typeof(ScriptVisibleAttribute), true).Any())
 						{
-							srm.AttachEvent(context, target, ei, value as FunctionObject);
+							EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
 
-							if (target is ObjectValue)
+							var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
+								typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+							if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
+								|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
 							{
-								((ObjectValue)target)[identifier] = value;
+								srm.AttachEvent(context, target, ei, value as FunctionObject);
+
+								if (target is ObjectValue)
+								{
+									((ObjectValue)target)[identifier] = value;
+								}
 							}
 						}
-					}
-				}
-				else 
-				{
-					#region DirectAccess
-				
-					PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
-
-					bool processed = false;
-
-					if (pi != null)
-					{
-						SetCLRProperty(context, pi, target, value);
-						processed = true;
 					}
 					else
 					{
-						FieldInfo fi = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+						#region DirectAccess
 
-						if (fi != null)
+						PropertyInfo pi = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+						bool processed = false;
+
+						if (pi != null)
 						{
-							SetCLRField(context, fi, target, value);
+							SetCLRProperty(context, pi, target, value);
 							processed = true;
 						}
 						else
 						{
-							// remove event if property value is set to null
-							if (value == null && srm.AllowCLREvent)
+							FieldInfo fi = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+							if (fi != null)
 							{
-								EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
-
-								var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
-									typeof(ScriptVisibleAttribute), true).FirstOrDefault();
-
-								if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
-									|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+								SetCLRField(context, fi, target, value);
+								processed = true;
+							}
+							else
+							{
+								// remove event if property value is set to null
+								if (value == null && srm.AllowCLREvent)
 								{
-									srm.DetachEvent(target, ei);
-									processed = true;
+									EventInfo ei = type.GetEvent(memberName, BindingFlags.Instance | BindingFlags.Public);
+
+									// commented out to fix bug #2
+									//
+									//var sva = ei == null ? null : (ScriptVisibleAttribute)ei.GetCustomAttributes(
+									//	typeof(ScriptVisibleAttribute), true).FirstOrDefault();
+
+									//if (sva != null && ei != null && (string.IsNullOrEmpty(sva.Alias)
+									//	|| sva.Alias.Equals(identifier, StringComparison.CurrentCultureIgnoreCase)))
+									//{
+										srm.DetachEvent(target, ei);
+										processed = true;
+									//}
 								}
 							}
 						}
-					}
 
-					if (!processed)
-					{
-						PropertyInfo[] pis = type.GetProperties();
-						foreach (var prop in pis)
+						if (!processed)
 						{
-							var idxparas = prop.GetIndexParameters();
-							if (idxparas != null && idxparas.Length == 1 && idxparas[0].ParameterType == typeof(string))
+							PropertyInfo[] pis = type.GetProperties();
+							foreach (var prop in pis)
 							{
-								try
+								var idxparas = prop.GetIndexParameters();
+								if (idxparas != null && idxparas.Length == 1 && idxparas[0].ParameterType == typeof(string))
 								{
-									prop.SetValue(target, srm.ConvertToCLRType(context, value ,prop.PropertyType), new object[] { identifier });
-								}
-								catch (Exception ex)
-								{
-									if (!srm.IgnoreCLRExceptions)
+									try
 									{
-										throw ex;
+										prop.SetValue(target, srm.ConvertToCLRType(context, value, prop.PropertyType), new object[] { identifier });
+									}
+									catch (Exception ex)
+									{
+										if (!srm.IgnoreCLRExceptions)
+										{
+											throw ex;
+										}
 									}
 								}
 							}
 						}
-					}
 
-					#endregion
-				}
+						#endregion
+					}
 			}
 			else
 			{
@@ -2697,8 +2722,8 @@ namespace unvell.ReoScript
 					object proto = null;
 					if (objValue.TryGetValue(ScriptRunningMachine.KEY___PROTO__, out proto))
 					{
-						val = PropertyAccessHelper.GetProperty(ctx,
-							objValue.GetOwnProperty(ScriptRunningMachine.KEY___PROTO__), identifier);
+						// recruive get property from object's protocol
+						val = PropertyAccessHelper.GetProperty(ctx, objValue[ScriptRunningMachine.KEY___PROTO__], identifier);
 					}
 
 					if (val == null && srm.AllowDirectAccess)
@@ -3221,7 +3246,7 @@ namespace unvell.ReoScript
 				{
 					string identifier = t.Children[0].Text;
 
-					IVariableContainer container = null;
+					IVariableProvider container = null;
 
 					CallScope cs = ctx.CurrentCallScope;
 
@@ -3562,7 +3587,7 @@ namespace unvell.ReoScript
 
 					foreach (string key in leftObj)
 					{
-						if (rightObj.HasOwnProperty(key))
+						if (rightObj.HasProperty(key))
 						{
 							resultObject[key] = leftObj[key];
 						}
@@ -3681,7 +3706,7 @@ namespace unvell.ReoScript
 				{
 					string identifier = t.Children[0].Text;
 
-					IVariableContainer container = null;
+					IVariableProvider container = null;
 
 					CallScope cs = ctx.CurrentCallScope;
 
@@ -3775,7 +3800,7 @@ namespace unvell.ReoScript
 				{
 					string identifier = t.Children[0].Text;
 
-					IVariableContainer container = null;
+					IVariableProvider container = null;
 
 					CallScope cs = ctx.CurrentCallScope;
 
@@ -4270,7 +4295,7 @@ namespace unvell.ReoScript
 		}
 		#endregion
 		#region Switch Case
-		class SwitchCaseStatementNodeParser : INodeParser
+		class  SwitchCaseStatementNodeParser : INodeParser
 		{
 			private ExprEqualsNodeParser equalsParser = new ExprEqualsNodeParser();
 
@@ -5214,9 +5239,9 @@ namespace unvell.ReoScript
 				if (t.Type == ReoScriptLexer.IDENTIFIER)
 				{
 					string identifier = t.Text;
-					if (ctx.GlobalObject.HasOwnProperty(identifier))
+					if (ctx.GlobalObject.HasProperty(identifier))
 					{
-						ctx.GlobalObject.RemoveOwnProperty(identifier);
+						ctx.GlobalObject.RemoveProperty(identifier);
 						return true;
 					}
 				}
@@ -5250,7 +5275,7 @@ namespace unvell.ReoScript
 
 					if (ownerObject != null)
 					{
-						ownerObject.RemoveOwnProperty(t.Children[1].Text);
+						ownerObject.RemoveProperty(t.Children[1].Text);
 						return true;
 					}
 				}
@@ -5607,7 +5632,7 @@ namespace unvell.ReoScript
 		}
 		#endregion
 		#region RangeGenerator
-		#if EXTERNAL_GETTER_SETTER
+		[Obsolete("Not Available Yet")]
 		class RangeLiteralParser : INodeParser
 		{
 			public object Parse(CommonTree t, ScriptRunningMachine srm, ScriptContext ctx)
@@ -5621,15 +5646,14 @@ namespace unvell.ReoScript
 				//if (from is IAccess) from = ((IAccess)from).Get();
 				//if (to is IAccess) to = ((IAccess)to).Get();
 
-				if (ctx.ExternalRangeGenerator != null)
-				{
-					ctx.ExternalRangeGenerator(fromText, toText);
-				}
+				//if (ctx.ExternalRangeGenerator != null)
+				//{
+				//	ctx.ExternalRangeGenerator(fromText, toText);
+				//}
 
 				return null;
 			}
 		}
-		#endif
 		#endregion
 	}
 	#endregion
@@ -5815,76 +5839,13 @@ namespace unvell.ReoScript
 		{
 			get
 			{
-#if EXTERNAL_GETTER_SETTER
-				if (ExternalVariableGetter != null)
-				{
-					var val = (ExternalVariableGetter(identifier));
-					if (val != null)
-					{
-						return val;
-					}
-				}
-#endif
-			
-				IVariableContainer container = null;
-
-				CallScope cs = CurrentCallScope;
-
-				if (cs != null)
-				{
-					if (cs.Variables.ContainsKey(identifier))
-					{
-						container = cs;
-					}
-					else
-					{
-						CallScope outerScope = cs.CurrentFunction.OuterCallScope;
-						while (outerScope != null)
-						{
-							if (outerScope.Variables.ContainsKey(identifier))
-							{
-								container = outerScope;
-								break;
-							}
-
-							outerScope = outerScope.CurrentFunction.OuterCallScope;
-						}
-					}
-				}
-
-				if (container == null)
-				{
-					container = GlobalObject;
-				}
-
-				object o = null;
-				container.TryGetValue(identifier, out o);
-
-				//if (CurrentCallScope == null)
-				//  return GlobalObject[identifier];
-
-				//object obj = CurrentCallScope[identifier];
-
-				//if (obj != null)
-				//  return obj;
-				//else
-				//  return GlobalObject[identifier];
-				return o;
+				object value;
+				TryGet(identifier, out value);
+				return value;
 			}
 			set
 			{
-#if EXTERNAL_GETTER_SETTER
-				if (ExternalVariableSetter != null
-					&& ExternalVariableSetter(identifier, value))
-				{
-					return;
-				}
-#endif
-
-				if (CurrentCallScope != null)
-					CurrentCallScope[identifier] = value;
-				else
-					GlobalObject[identifier] = value;
+				SetVariable(identifier, value);
 			}
 		}
 
@@ -5897,6 +5858,14 @@ namespace unvell.ReoScript
 		/// <returns>value to be set</returns>
 		public object SetVariable(string identifier, object value)
 		{
+#if EXTERNAL_VARIABLE_ACCESSOR
+			if (ExternalVariableSetter != null
+					&& ExternalVariableSetter(identifier, value))
+			{
+				return value;
+			}
+#endif
+
 			if (CurrentCallScope != null)
 				CurrentCallScope[identifier] = value;
 			else
@@ -5913,20 +5882,14 @@ namespace unvell.ReoScript
 		/// <returns>value of specified variable</returns>
 		public object GetVariable(string identifier)
 		{
-			if (CurrentCallScope == null)
-				return GlobalObject[identifier];
-
-			object obj = CurrentCallScope[identifier];
-
-			if (obj != null)
-				return obj;
-			else
-				return GlobalObject[identifier];
+			object value;
+			TryGet(identifier, out value);
+			return value;
 		}
 
 		internal bool TryGet(string identifier, out object value)
 		{
-#if EXTERNAL_GETTER_SETTER
+#if EXTERNAL_VARIABLE_ACCESSOR && EXTERNAL_PRIORITY
 			if (ExternalVariableGetter != null)
 			{
 				value = ExternalVariableGetter(identifier);
@@ -5937,7 +5900,7 @@ namespace unvell.ReoScript
 				}
 			}
 #endif
-
+		
 			CallScope cs = CurrentCallScope;
 
 			if (cs != null)
@@ -5966,6 +5929,18 @@ namespace unvell.ReoScript
 				return true;
 			}
 
+#if EXTERNAL_VARIABLE_ACCESSOR && !EXTERNAL_PRIORITY
+			if (ExternalVariableGetter != null)
+			{
+				value = ExternalVariableGetter(identifier);
+
+				if (value != null)
+				{
+					return true;
+				}
+			}
+#endif
+
 			return false;
 		}
 
@@ -5977,7 +5952,7 @@ namespace unvell.ReoScript
 		public void RemoveVariable(string identifier)
 		{
 			if (CurrentCallScope == null)
-				GlobalObject.RemoveOwnProperty(identifier);
+				GlobalObject.RemoveProperty(identifier);
 			else
 				CurrentCallScope.Variables.Remove(identifier);
 		}
@@ -6004,16 +5979,10 @@ namespace unvell.ReoScript
 			PropertyAccessHelper.SetProperty(this, obj, identifier, value);
 		}
 
-#if EXTERNAL_GETTER_SETTER
+#if EXTERNAL_VARIABLE_ACCESSOR
 		public Func<string, object> ExternalVariableGetter { get; set; }
 
 		public Func<string, object, bool> ExternalVariableSetter { get; set; }
-
-		//public Dictionary<Func<string, bool>, Func<string, object>> PropertyGetter { get; set; }
-
-		//public Dictionary<Func<string, bool>, Func<string, object>> PropertySetter { get; set; }
-
-		public Func<string, string, object> ExternalRangeGenerator { get; set; }
 #endif
 
 		#endregion
@@ -6195,16 +6164,22 @@ namespace unvell.ReoScript
 
 		#endregion
 
-
 	}
 
-	interface IVariableContainer
+	interface IVariableProvider 
 	{
 		object this[string identifier] { get; set; }
 		bool TryGetValue(string identifier, out object value);
+		bool TrySetValue(string identifier, object value);
 	}
 
-	internal class CallScope : IVariableContainer
+	interface IVariableContainer : IVariableProvider
+	{
+		bool HasProperty(string identifier);
+		bool RemoveProperty(string identifier);
+	}
+
+	internal class CallScope : IVariableProvider
 	{
 		public object ThisObject { get; set; }
 		public AbstractFunctionObject CurrentFunction { get; set; }
@@ -6240,6 +6215,12 @@ namespace unvell.ReoScript
 			return variables.TryGetValue(identifier, out value);
 		}
 
+		public bool TrySetValue(string identifier, object value)
+		{
+			variables[identifier] = value;
+			return true;
+		}
+
 		public bool IsInnerCall { get; set; }
 
 		public int CharIndex { get; set; }
@@ -6264,9 +6245,26 @@ namespace unvell.ReoScript
 			
 			return fun.FunName;
 		}
-
 	}
 
+#if EXTERNAL_GETTER_SETTER
+	/// <summary>
+	/// External Variable Accessor Priority. 
+	/// 
+	/// If InternalFirst is specified, ReoScript will try to get the variable from internal accessor,
+	/// if variable cannot be found, then try to get from external accessor. 
+	/// 
+	/// If ExternalFirst is specified, ReoScript will try to get the variable from external accessor,
+	/// then will try to get from external accessor if variable not found.
+	/// 
+	/// This flag only available when ReoScript compiled with EXTERNAL_GETTER_SETTER symbol is specified.
+	/// </summary>
+	public enum ExternalAccessPriority
+	{
+		InternalFirst,
+		ExternalFirst,
+	}
+#endif // EXTERNAL_GETTER_SETTER
 
 	#endregion
 
@@ -6315,8 +6313,9 @@ namespace unvell.ReoScript
 		public ScriptRunningMachine()
 			: this(CoreFeatures.StandardFeatures)
 		{
-			//this();
 		}
+
+	
 
 		/// <summary>
 		/// Construct SRM with specified feature support.
@@ -6503,7 +6502,7 @@ namespace unvell.ReoScript
 		/// <returns>true if specified variable does exist and deleting is successed</returns>
 		public bool RemoveGlobalVariable(string identifier)
 		{
-			return GlobalObject.RemoveOwnProperty(identifier);
+			return GlobalObject.RemoveProperty(identifier);
 		}
 
 		/// <summary>
@@ -8579,8 +8578,35 @@ namespace unvell.ReoScript
 		/// <returns>true if object is number type</returns>
 		public static bool IsNumber(object target)
 		{
-			return target is double || target is int || target is float || target is char || target is byte 
-				|| target is short || target is long;
+			return (target is double || target is int || target is float || target is char || target is byte
+					|| target is short || target is long);
+
+			//if (target is double || target is int || target is float || target is char || target is byte
+			//		|| target is short || target is long)
+			//	return true;
+			//else if (target is string)
+			//{
+			//	string str = (string)target;
+			//	return str.Length > 0 && IsNumber((string)(target));
+			//}
+			//else
+			//	return false;
+		}
+
+		/// <summary>
+		/// Check whether specified string is an valid number
+		/// </summary>
+		/// <param name="str">the string to be checked</param>
+		/// <returns>true if string is an valid number</returns>
+		public static bool IsNumber(string str)
+		{
+			for (int i = 0; i < str.Length; i++)
+			{
+				char c = str[i];
+				if ((c < 48 && c != '.' && c != '-') || c > 57) return false;
+			}
+
+			return true;
 		}
 
 		/// <summary>
@@ -8901,7 +8927,7 @@ namespace unvell.ReoScript
 	#endregion
 
 	#region built-in Object Constructors
-	internal class BuiltinConstructors
+	internal sealed class BuiltinConstructors
 	{
 		internal ObjectConstructorFunction ObjectFunction;
 		internal StringConstructorFunction StringFunction;
@@ -8974,15 +9000,7 @@ namespace unvell.ReoScript
 						return 0;
 					}
 
-					double num = 0;
-					if (double.TryParse(Convert.ToString(args[0]), out num))
-					{
-						return num;
-					}
-					else
-					{
-						return NaNValue.Value;
-					}
+					return ScriptRunningMachine.GetDoubleValue(args[0]);
 				}, (proto) =>
 				{
 					proto["toString"] = new NativeFunctionObject("toString", (ctx, owner, args) =>
@@ -9190,9 +9208,7 @@ namespace unvell.ReoScript
 				#region JSON
 				if ((srm.CoreFeatures & CoreFeatures.JSON) == CoreFeatures.JSON)
 				{
-					ObjectValue json = new ObjectValue(){
-						//Name = "JSON",
-					};
+					ObjectValue json = new ObjectValue();
 
 					json["parse"] = new NativeFunctionObject("parse", (ctx, owner, args) =>
 					{
@@ -9210,7 +9226,7 @@ namespace unvell.ReoScript
 
 						if (args.Length == 1 || args[1] == null || (!(args[1] is AbstractFunctionObject)))
 						{
-							parser.jsonParse(ctx, (key, value) => { obj[key] = value; });
+							parser.jsonParse(ctx, (key, value) => obj[key] = value);
 						}
 						else
 						{
@@ -9605,8 +9621,26 @@ namespace unvell.ReoScript
 						return null;
 					});
 
-					DebugObject["total_created_objects"] = new ExternalProperty(
-						() => { return totalObjectCreated; }, null);
+					DebugObject["assertTrue"] = new NativeFunctionObject("assert", (ctx, owner, args) =>
+					{
+						if (args.Length == 0)
+						{
+							throw new ReoScriptAssertionException("assertion failed.");
+						}
+						else if (args.Length == 1)
+						{
+							if (!ScriptRunningMachine.GetBoolValue(args[0]))
+								throw new ReoScriptAssertionException("assertion failed.");
+						}
+						else if (args.Length == 2)
+						{
+							if (!ScriptRunningMachine.GetBoolValue(args[0]))
+								throw new ReoScriptAssertionException(ScriptRunningMachine.ConvertToString(args[1]));
+						}
+						return null;
+					});
+
+					DebugObject["total_created_objects"] = new ExternalProperty(() => totalObjectCreated, null);
 				}
 
 				RestoreDebugger();
@@ -9656,6 +9690,8 @@ namespace unvell.ReoScript
 			public int Index { get; set; }
 			public int Length { get; set; }
 			public string TestCode { get; set; }
+
+			public void WhenHit() { }
 		}
 
 	}

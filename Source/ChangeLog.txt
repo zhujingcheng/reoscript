@@ -1,3 +1,9 @@
+
+v1.4.4 4/23/2013
+ - Fixed: Cannot detech an event via DirectAccess mode
+ - Fixed: Shell: Cannot enter console mode without target files specified
+ - Changed: Shell: expression without ? prefix also could be evaluated in console
+
 v1.4.3 2/20/2013
  - Fixed: cannot accessing field member and event in ScriptVisible mode
  - Changed interface define of ExternalVariableAccessor for ScriptContext

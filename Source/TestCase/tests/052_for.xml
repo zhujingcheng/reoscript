@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
 -->
@@ -81,11 +81,13 @@
       var a = [[1,2,3],[4,5,6],[7,8,9]];
 
       var o = '';
-      for(i=0;i&lt;a.length;i++)
-        for(k=0;k&lt;a[i].length;k++)
-          o+=a[i][k];
+      for(i=0;i&lt;a.length;i++) {
+        for(k=0;k&lt;a[i].length;k++) {
+          o += a[i][k];
+        }
+      }
 
-      t( o == '123456789' );
+      t( o, '123456789' );
 
       var a = [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]];
       var o = '';
@@ -96,12 +98,11 @@
        
         for (k=0; k&lt;a[i].length; k++) {
           if (k > 2) break;
-        
-          o+=a[i][k];
+          o += String(a[i][k]);
         }
       }
       
-      t( o == '123123' );
+      t( o, '123123' );
     </script>
   </test-case>
 

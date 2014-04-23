@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -35,9 +35,28 @@ namespace unvell.ReoScript.Extensions
 		public DirectoryInfo DirInfo { get; set; }
 	}
 
-	public class FileConstructorFunction : TypedNativeFunctionObject<DirectoryObject>
+	public class FileConstructorFunction : TypedNativeFunctionObject<FileObject>
 	{
+		public override object CreateObject(ScriptContext context, object[] args)
+		{
+			if (args.Length == 0)
+			{
+				return null;
+			}
+			
+			if (args.Length == 1)
+			{
+				
+			}
 
+			return new FileObject();
+		}
+	}
+
+	public enum FileCreateFlag : byte
+	{
+		Open = 0x1,
+		Create = 0x2,
 	}
 
 	public class DirectoryConstructorFunction : TypedNativeFunctionObject<DirectoryObject>

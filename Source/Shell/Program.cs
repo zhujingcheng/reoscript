@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -30,16 +30,6 @@ namespace unvell.ReoScript
 	{
 		static void Main(string[] args)
 		{
-			if (args.Length == 0)
-			{
-				Console.WriteLine(
-@"ReoScript(TM) Running Machine
-Copyright(c) 2012-2013 unvell, All Rights Reserved.
-
-Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
-				return;
-			}
-
 			List<string> files = new List<string>();
 			string workPath = null;
 			bool debug = false;
@@ -47,6 +37,7 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 
 			bool consoleMode = false;
 			bool compileMode = false;
+			bool quietMode = true;
 
 			try
 			{
@@ -81,6 +72,10 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 							case "console":
 								consoleMode = true;
 								break;
+
+							case "v":
+								quietMode = false;
+								break;
 						}
 					}
 					else
@@ -95,6 +90,20 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 				return;
 			}
 
+			if (files.Count == 0 && !consoleMode && string.IsNullOrEmpty(initScript))
+			{
+				if (!quietMode)
+				{
+					OutLn(
+	@"ReoScript(TM) Running Machine
+Copyright(c) 2012-2013 unvell.com, All Rights Reserved.
+
+Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
+				}
+				
+				return;
+			}
+
 			List<FileInfo> sourceFiles = new List<FileInfo>();
 
 			foreach (string file in files)
@@ -104,7 +113,7 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 
 				if (!fi.Exists)
 				{
-					Console.WriteLine("Resource not found: " + fi.FullName);
+					OutLn("Resource not found: " + fi.FullName);
 				}
 				else
 				{
@@ -190,7 +199,7 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 
 			if (consoleMode)
 			{
-				OutLn("\nReady.\n");
+				if(!quietMode) OutLn("\nReady.\n");
 
 				bool isQuitRequired = false;
 
@@ -198,7 +207,8 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 				{
 					Prompt();
 
-					string line = In().Trim();
+					string line = In();
+
 					if (line == null)
 					{
 						isQuitRequired = true;
@@ -206,7 +216,14 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 					}
 					else if (line.StartsWith("."))
 					{
-						srm.Load(line.Substring(1, line.Length - 1));
+						try
+						{
+							srm.Load(line.Substring(1, line.Length - 1));
+						}
+						catch (Exception ex)
+						{
+							OutLn("error: " + ex.Message);
+						}
 					}
 					else if (line.StartsWith("/"))
 					{
@@ -227,31 +244,6 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 								break;
 						}
 					}
-					else if (line.Equals("?"))
-					{
-						ObjectValue obj = srm.DefaultContext.ThisObject as ObjectValue;
-						if (obj != null) OutLn(obj.DumpObject());
-					}
-					else if (line.StartsWith("?"))
-					{
-						string expression = line.Substring(1);
-						try
-						{
-							object value = srm.CalcExpression(expression);
-							if (value is ObjectValue)
-							{
-								OutLn(((ObjectValue)value).DumpObject());
-							}
-							else
-							{
-								OutLn(ScriptRunningMachine.ConvertToString(value));
-							}
-						}
-						catch (Exception ex)
-						{
-							OutLn("error: " + ex.Message);
-						}
-					}
 					else if (line.Length == 0)
 					{
 						continue;
@@ -260,13 +252,27 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 					{
 						try
 						{
-							srm.Run(line);
+							if (!line.EndsWith(";"))
+							{
+								line += ";";	
+							}
+							var res = srm.Run(line);
+							
+							if (res is ObjectValue)
+							{
+								OutLn(((ObjectValue)res).DumpObject());
+							}
+							else
+							{
+								OutLn(ScriptRunningMachine.ConvertToString(res));
+							}
 						}
 						catch (ReoScriptException ex)
 						{
 							Console.WriteLine("error: " + ex.Message + "\n");
 						}
 					}
+
 				}
 
 				OutLn("Bye.");
@@ -286,7 +292,7 @@ Usage: ReoScript.exe [filename|-workpath|-debug|-exec|-console]");
 		private static void Help()
 		{
 			OutLn(@"
-ReoScript Console Help
+ReoScript Shell Console Help
 
 /<system command>       submit system command.
   quit | q              quit from console.
@@ -297,6 +303,9 @@ ReoScript Console Help
 												in current global object.
 
 <statement>;						run script statement.
+
+.<path>                 load script resource from specified file.
+
 ");
 		}
 
@@ -310,11 +319,11 @@ ReoScript Console Help
 		}
 		private static void OutLn()
 		{
-			Console.WriteLine();
+			OutLn(string.Empty);
 		}
 		private static void OutLn(string msg)
 		{
-			Console.WriteLine(msg);
+			Out(msg + Environment.NewLine);
 		}
 		private static string In()
 		{

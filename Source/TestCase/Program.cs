@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -59,7 +59,7 @@ namespace unvell.ReoScript.TestCase
 			TestCaseRunner runner = new TestCaseRunner();
 
 			bool hasErrors = runner.RunLanguageTests(ids, enabledTags);
-			hasErrors |= runner.RunCLRTests();
+			hasErrors |= runner.RunCLRTests(ids);
 
 			//using (ReoScriptEditor editor = new ReoScriptEditor())
 			//{
@@ -75,7 +75,7 @@ namespace unvell.ReoScript.TestCase
 			//}
 
 			Console.WriteLine("Total result: \n");
-			Console.WriteLine("    {0,3} test cases, {1,3} successed, {2,3} failed, {3,3} skipped",
+			Console.WriteLine("    {0,4} test cases, {1,4} successed, {2,4} failed, {3,4} skipped",
 				runner.TotalCases, runner.TotalSuccesses, runner.TotalFailures,
 				(runner.TotalCases - runner.TotalSuccesses - runner.TotalFailures));
 			Console.WriteLine("  {0,5} objects created.\n", runner.TotalObjectCreates);
@@ -179,7 +179,7 @@ namespace unvell.ReoScript.TestCase
 				//Console.WriteLine();
 			}
 
-			Console.WriteLine("\n    {0,3} test cases, {1,3} successed, {2,3} failed, {3,3} skipped",
+			Console.WriteLine("\n    {0,4} test cases, {1,4} successed, {2,4} failed, {3,4} skipped",
 				testCases, success, failed, (testCases - success - failed));
 			Console.WriteLine("  {0,5} objects created.\n", debugMonitor.TotalObjectCreated);
 
@@ -191,7 +191,7 @@ namespace unvell.ReoScript.TestCase
 			return hasErrors;
 		}
 
-		public bool RunCLRTests()
+		public bool RunCLRTests(List<string> ids)
 		{
 			Console.WriteLine("Run CLR tests...\n");
 
@@ -224,54 +224,59 @@ namespace unvell.ReoScript.TestCase
 						TestCaseAttribute[] caseAttrs = method.GetCustomAttributes(typeof(TestCaseAttribute), false)
 							as TestCaseAttribute[];
 
-						if (caseAttrs.Length > 0 && !caseAttrs[0].Disabled)
+						if (caseAttrs.Length > 0)
 						{
 							testCases++;
 
 							var caseName = caseAttrs[0].Desc;
 							if (string.IsNullOrEmpty(caseName)) caseName = method.Name;
 
-							Console.Write("[{0,-18}] {1,-30} : ", testName, caseName);
-
-							if (testSuite is ReoScriptTestSuite)
+							if (!caseAttrs[0].Disabled
+								&& (ids == null || ids.Count == 0 || ids.Any(id => method.Name.Contains(id))))
 							{
-								srm.WorkMode = caseAttrs[0].WorkMode;
-								srm.Reset();
-								((ReoScriptTestSuite)testSuite).SRM = srm;
-							}
+								Console.Write("[{0,-18}] {1,-30} : ", testName, caseName);
 
-							try
-							{
-								sw.Reset();
-								sw.Start();
+								if (testSuite is ReoScriptTestSuite)
+								{
+									srm.WorkMode = caseAttrs[0].WorkMode;
+									srm.Reset();
+									((ReoScriptTestSuite)testSuite).SRM = srm;
+								}
 
-								method.Invoke(testSuite, null);
+								try
+								{
+									sw.Reset();
+									sw.Start();
 
-								sw.Stop();
-								success++;
+									method.Invoke(testSuite, null);
 
-								Console.WriteLine("{0,5} ms. {1,4} objs.", sw.ElapsedMilliseconds,
-									debugMonitor.TotalObjectCreated - createdObjs);
+									sw.Stop();
+									success++;
 
-								createdObjs = debugMonitor.TotalObjectCreated;
-							}
-							catch (Exception ex)
-							{
-								failed++;
-								Console.WriteLine(string.IsNullOrEmpty(ex.InnerException.Message) ? "failed" : ex.InnerException.Message);
+									Console.WriteLine("{0,5} ms. {1,4} objs.", sw.ElapsedMilliseconds,
+										debugMonitor.TotalObjectCreated - createdObjs);
 
-								hasErrors = true;
-							}
-							finally
-							{
-								sw.Stop();
+									createdObjs = debugMonitor.TotalObjectCreated;
+								}
+								catch (Exception ex)
+								{
+									failed++;
+									Console.WriteLine(string.IsNullOrEmpty(ex.InnerException.Message) ? "failed" : ex.InnerException.Message);
+
+									hasErrors = true;
+								}
+								finally
+								{
+									sw.Stop();
+								}
+
 							}
 						}
 					}
 				}
 			}
 
-			Console.WriteLine("\n    {0,3} test cases, {1,3} successed, {2,3} failed, {3,3} skipped",
+			Console.WriteLine("\n    {0,4} test cases, {1,4} successed, {2,4} failed, {3,4} skipped",
 				testCases, success, failed, (testCases - success - failed));
 			Console.WriteLine("  {0,5} objects created.\n", debugMonitor.TotalObjectCreated);
 

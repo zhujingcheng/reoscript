@@ -10,7 +10,7 @@
  * PURPOSE.
  *
  * This software released under LGPLv3 license.
- * Author: Jing Lu <dujid0@gmail.com>
+ * Author: Jing Lu <dujid0 at gmail.com>
  * 
  * Copyright (c) 2012-2014 unvell.com, all rights reserved.
  * 
@@ -48,6 +48,7 @@ namespace unvell.ReoScript.TestCase
 			TestCaseAssertion.AssertEquals(srm["b"], 30d);
 		}
 
+#if EXTERNAL_VARIABLE_ACCESSOR
 		[TestCase]
 		public void ExtendedVariableAccessor()
 		{
@@ -67,6 +68,7 @@ namespace unvell.ReoScript.TestCase
 
 			TestCaseAssertion.AssertEquals(result, "A1");
 		}
+#endif
 	}
 
 	#region Wrapper
@@ -102,7 +104,7 @@ namespace unvell.ReoScript.TestCase
 			srm.Run(@"
 
 myobj.name = 'hello';
-myobj.external = 'world';
+myobj.external = 'world';biru 
 var result = myobj.add(1,2);
 
 debug.assert(myobj.name, 'hello');
@@ -137,6 +139,46 @@ debug.assert(result, 3);
 			});
 
 			SRM.Run(@"debug.assert( myfunc(1, 2), 3 );");
+		}
+
+		[TestCase]
+		public void ExtendedObjectValue()
+		{
+			var extObj = new MyObjectValue();
+
+			SRM["extObj"] = extObj;
+
+			SRM.Run("extObj.testProp = 'a';");
+			TestCaseAssertion.AssertTrue(extObj.ValueSetted);  // true
+			TestCaseAssertion.AssertTrue(!extObj.ValueGetted); // false
+
+			SRM.Run("var a = extObj.testProp;");
+			TestCaseAssertion.AssertTrue(extObj.ValueSetted);  // true
+			TestCaseAssertion.AssertTrue(extObj.ValueGetted);  // true
+
+			extObj = new MyObjectValue();
+
+			//SRM.Run("extObj.testProp = 'a';");
+			TestCaseAssertion.AssertTrue(!extObj.ValueSetted);  // true
+			TestCaseAssertion.AssertTrue(!extObj.ValueGetted); // false
+		}
+	}
+	
+	class MyObjectValue : ObjectValue
+	{
+		public bool ValueGetted { get; set; }
+		public bool ValueSetted { get; set; }
+
+		public override bool TryGetValue(string identifier, out object value)
+		{
+			if (identifier == "testProp") ValueGetted = true;
+			return base.TryGetValue(identifier, out value);
+		}
+
+		public override bool TrySetValue(string identifier, object value)
+		{
+			if (identifier == "testProp") ValueSetted = true;
+			return base.TrySetValue(identifier, value);
 		}
 	}
 
@@ -248,6 +290,15 @@ debug.assert(result, 3);
 		}
 
 		#endregion
+	}
+
+	class EventStub
+	{
+		public event EventHandler DummyEvent;
+		public void RaiseEvent()
+		{
+			if (DummyEvent != null) DummyEvent(this, null);
+		}
 	}
 
 	[TestSuite("DirectAccess")]
@@ -601,6 +652,35 @@ debug.assert( StaticClassTest.a, 20 );
 		public void TestCaseTemplate()
 		{
 		}
+
+		[TestCase(WorkMode = MachineWorkMode.AllowDirectAccess | MachineWorkMode.AllowCLREventBind)]
+		public void EventBindTest()
+		{
+			var c = new EventStub();
+
+			SRM["c"] = c;
+
+			SRM.Run(@"
+var t = debug.assert;
+t( c.DummyEvent, null );
+var a = 10;
+c.DummyEvent = function() {
+  a = 20;
+};
+debug.assertTrue( c.DummyEvent != null, 'event not be attached' );
+");
+
+			c.RaiseEvent();
+
+			SRM.Run(@"
+t( a, 20 );
+t( c.DummyEvent != null );
+c.DummyEvent = null;
+debug.assertTrue( c.DummyEvent == null, 'event not be detached.' );
+");
+
+		}
+
 	}
 	#endregion // DirectAccess
 
@@ -617,6 +697,8 @@ debug.assert( StaticClassTest.a, 20 );
 		[ScriptVisible]
 		public event EventHandler EventMember;
 
+		public event EventHandler EventWithoutScriptVisible;
+
 		[ScriptVisible] 
 		public List<string> PhoneNumbers { get; set; }
 
@@ -632,6 +714,14 @@ debug.assert( StaticClassTest.a, 20 );
 			if (this.EventMember != null)
 			{
 				this.EventMember(this, null);
+			}
+		}
+
+		internal void RaiseEventMemberWithoutScriptVisible()
+		{
+			if (this.EventWithoutScriptVisible != null)
+			{
+				this.EventWithoutScriptVisible(this, null);
 			}
 		}
 	}
@@ -739,6 +829,33 @@ t( c.fieldMember, 10 );
 
 ");
 		}
+
+		[TestCase(WorkMode = MachineWorkMode.Default)]
+		public void EventTest()
+		{
+			SRM["c"] = new Contact();
+
+			SRM.Run(@"
+var t = debug.assert;
+t( c.EventMember, null );
+var a = 10;
+c.EventMember = function() {
+  a = 20;
+};
+t( c.EventMember != null );
+");
+
+			((Contact)SRM["c"]).RaiseEventMember();
+
+			SRM.Run(@"
+t( a, 20 );
+t( c.EventMember != null );
+c.EventMember = null;
+t( c.EventMember, null );
+");
+
+		}
+
 	}
 	#endregion // ScriptVisible
 

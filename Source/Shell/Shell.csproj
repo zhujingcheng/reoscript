@@ -50,7 +50,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Extensions\Extensions.csproj">
       <Project>{960D814F-1CD6-41A7-8D37-B8F73B92C05A}</Project>
-      <Name>ReoScriptExtensions</Name>
+      <Name>Extensions</Name>
     </ProjectReference>
     <ProjectReference Include="..\ReoScript\ReoScript.csproj">
       <Project>{544005E7-F55A-42E2-8DDB-B43F95F27C69}</Project>
@@ -58,7 +58,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="scripts\a.reo" />
+    <None Include="scripts\a.reo">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="scripts\c.reo">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
