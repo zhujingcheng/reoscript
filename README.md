@@ -1,8 +1,8 @@
 ReoScript
 =========
-**Script language engine for .Net programs**
+**Script language engine for .NET programs**
 
-ReoScript is a powerful JavaScript-like script language engine implemented in C#. It was designed for inclusion in applications that require a built-in, easy to use, scalable script language with no dependencies other language like C/C++.
+ReoScript is a powerful JavaScript-like script language engine for .NET Applications. It was designed for inclusion in applications that require a built-in, easy to use, scalable script language with no dependencies other language like C/C++.
 
 ## Features
 
